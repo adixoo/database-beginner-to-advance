@@ -1,0 +1,24 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { LEVELS, PATHS, type Level } from '../../config/site';
+import LevelLayout from '../../layouts/LevelLayout.astro';
+
+export const getStaticPaths = (() =>
+	LEVELS.map((level) => ({ params: { level } }))) satisfies GetStaticPaths;
+
+const level = Astro.params.level as Level;
+const path = PATHS[level];
+---
+
+<LevelLayout level={level} title={path.label} description={path.summary}>
+	<h1 class="text-[clamp(56px,10vw,152px)] leading-[0.95] font-bold tracking-[-0.03em]" data-reveal>
+		{path.label}
+	</h1>
+	<p
+		class="mt-8 max-w-[30ch] text-[clamp(20px,1.8vw,26px)] leading-snug"
+		data-reveal
+		style="--i: 1"
+	>
+		{path.summary}
+	</p>
+</LevelLayout>

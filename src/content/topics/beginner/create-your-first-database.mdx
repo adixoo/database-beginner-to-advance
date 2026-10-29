@@ -1,0 +1,129 @@
+---
+title: Create your first database
+description: Plan a schema, create a database and build your first tables with SQL, using SQLite.
+level: beginner
+order: 3
+---
+
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Let's build a tiny Instagram: a database with a table for users and a table for their posts. We will use **SQLite**, because the whole database is a single file and there is no server to set up. The SQL you write here works almost the same in PostgreSQL and MySQL.
+
+## Plan your tables
+
+Before writing any SQL, decide what you need to store. Think in things, not screens: each kind of thing becomes a table, and each detail about it becomes a column.
+
+- A **user** has a username and a name.
+- A **post** has a caption, and it belongs to one user.
+
+Every table also gets an `id` column, so each row can be found by a number that never repeats.
+
+## Design the schema
+
+The **schema** is the plan for your tables: the columns, the type of data each one holds, and the rules it must follow. Here is ours:
+
+| Table | Column     | Type    | Rule                       |
+| ----- | ---------- | ------- | -------------------------- |
+| users | id         | INTEGER | Primary key                |
+| users | username   | TEXT    | Required, no duplicates    |
+| users | name       | TEXT    | Required                   |
+| users | created_at | TEXT    | Filled in automatically    |
+| posts | id         | INTEGER | Primary key                |
+| posts | user_id    | INTEGER | Required, points to a user |
+| posts | caption    | TEXT    | Optional                   |
+| posts | created_at | TEXT    | Filled in automatically    |
+
+The three data types you need to start:
+
+| Type    | Holds                 | Example        |
+| ------- | --------------------- | -------------- |
+| INTEGER | Whole numbers         | `42`           |
+| TEXT    | Words and sentences   | `'asha.codes'` |
+| REAL    | Numbers with decimals | `4.5`          |
+
+## Create the database
+
+[Download SQLite](https://www.sqlite.org/download.html) if you do not have it; it comes pre-installed on macOS and most Linux systems. Then open a terminal and run:
+
+```bash
+sqlite3 instagram.db
+```
+
+This opens the SQLite shell for a database called `instagram.db`. The file is created on disk as soon as you add your first table. Everything you type at the `sqlite>` prompt runs against this database.
+
+In PostgreSQL or MySQL, a server holds many databases, so you create one by name instead: `CREATE DATABASE instagram;`
+
+## Create the tables
+
+Now turn the schema into SQL. `CREATE TABLE` takes the table name, then each column with its type and rules:
+
+```sql
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE posts (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id),
+  caption TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Each rule maps straight to the schema table:
+
+- `PRIMARY KEY` makes `id` the unique number for each row. In SQLite it fills itself in when you add a row.
+- `NOT NULL` means the column is required.
+- `UNIQUE` stops two users from having the same username.
+- `DEFAULT CURRENT_TIMESTAMP` fills in the date and time automatically.
+- `REFERENCES users (id)` makes `user_id` a **foreign key**: every post must point to a user that exists.
+
+SQLite only enforces foreign keys when you switch them on, once per connection:
+
+```sql
+PRAGMA foreign_keys = ON;
+```
+
+## Check your tables
+
+SQLite has shortcut commands that start with a dot. `.tables` lists your tables, and `.schema` shows how one was created:
+
+```text
+sqlite> .tables
+posts  users
+sqlite> .schema posts
+CREATE TABLE posts (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id),
+  caption TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+If both tables are listed, your database is ready. Type `.quit` to leave the shell; the data stays in `instagram.db`.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Constraint**
+  A rule a column must follow, such as NOT NULL or UNIQUE.
+- **CREATE TABLE**
+  The SQL command that builds a new table from your schema.
+- **Data type**
+  The kind of value a column holds: INTEGER, TEXT or REAL.
+- **Foreign key**
+  A column that points to a row in another table.
+- **NOT NULL**
+  A rule that makes a column required.
+- **Primary key**
+  The column whose value is unique for every row.
+- **Schema**
+  The plan for your tables: columns, types and rules.
+- **UNIQUE**
+  A rule that stops two rows having the same value.
+
+</WordsToKnow>

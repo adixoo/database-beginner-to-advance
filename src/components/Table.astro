@@ -1,0 +1,128 @@
+---
+import { TABLE_CLASSES, bodyToneClass, headerAlignClass } from './table-styles';
+
+// Data table in the Pastel Noir palette, following the taste skill's table rules:
+// no header band, no zebra stripes, numbers right-aligned in tabular figures.
+
+export type TableAccent = 'mint' | 'sky' | 'peach' | 'lilac';
+export type TableStatus = 'positive' | 'caution' | 'negative';
+export type TableValue = string | number | null;
+
+export interface TableColumn {
+	key: string;
+	label: string;
+	// Right-aligns the column and sets its values as figures
+	numeric?: boolean;
+}
+
+export interface TableCell {
+	value: TableValue;
+	// Leads the value with a coloured dot; the value text must still carry the meaning
+	status?: TableStatus;
+}
+
+export type TableRow = Record<string, TableValue | TableCell>;
+
+interface Props {
+	columns: TableColumn[];
+	rows: TableRow[];
+	// Read by screen readers; the visible title belongs in the heading above the table
+	caption: string;
+	// Index of the one row that matters. Its first cell takes the accent.
+	highlight?: number;
+	accent?: TableAccent;
+	class?: string;
+}
+
+const { columns, rows, caption, highlight, accent = 'mint', class: className } = Astro.props;
+
+// Full class names so Tailwind can find them
+const ACCENT_CLASSES: Record<TableAccent, { wash: string; text: string }> = {
+	mint: { wash: 'bg-mint/14', text: 'text-mint' },
+	sky: { wash: 'bg-sky/14', text: 'text-sky' },
+	peach: { wash: 'bg-peach/14', text: 'text-peach' },
+	lilac: { wash: 'bg-lilac/14', text: 'text-lilac' },
+};
+
+const STATUS: Record<TableStatus, { dot: string; label: string }> = {
+	positive: { dot: 'bg-mint', label: 'Good' },
+	caution: { dot: 'bg-butter', label: 'Caution' },
+	negative: { dot: 'bg-rose', label: 'Bad' },
+};
+
+const toCell = (cell: TableValue | TableCell | undefined): TableCell =>
+	cell !== null && typeof cell === 'object' ? cell : { value: cell ?? null };
+
+const format = (value: TableValue): string | null =>
+	value === null ? null : typeof value === 'number' ? value.toLocaleString('en-US') : value;
+
+const captionId = `table-${Math.random().toString(36).slice(2, 9)}`;
+const accentClasses = ACCENT_CLASSES[accent];
+---
+
+<div
+	class:list={[TABLE_CLASSES.frame, className]}
+	role="region"
+	aria-labelledby={captionId}
+	tabindex="0"
+>
+	<table class:list={[TABLE_CLASSES.table, TABLE_CLASSES.links]}>
+		<caption id={captionId} class="sr-only">{caption}</caption>
+		<thead>
+			<tr>
+				{
+					columns.map((column) => (
+						<th
+							scope="col"
+							class:list={[TABLE_CLASSES.headerCell, headerAlignClass(Boolean(column.numeric))]}
+						>
+							{column.label}
+						</th>
+					))
+				}
+			</tr>
+		</thead>
+		<tbody>
+			{
+				rows.map((row, rowIndex) => {
+					const isHighlighted = rowIndex === highlight;
+					return (
+						<tr class={TABLE_CLASSES.row}>
+							{columns.map((column, columnIndex) => {
+								const cell = toCell(row[column.key]);
+								const text = format(cell.value);
+								const isLabel = columnIndex === 0;
+								return (
+									<td
+										class:list={[
+											TABLE_CLASSES.bodyCell,
+											bodyToneClass(Boolean(column.numeric)),
+											isHighlighted && [accentClasses.wash, 'first:rounded-l-md last:rounded-r-md'],
+											isHighlighted && isLabel && [accentClasses.text, 'font-semibold'],
+										]}
+									>
+										{cell.status && (
+											<span
+												class:list={[
+													'mr-2 inline-block size-2 rounded-full align-middle',
+													STATUS[cell.status].dot,
+												]}
+												aria-hidden="true"
+											/>
+										)}
+										{cell.status && <span class="sr-only">{STATUS[cell.status].label}: </span>}
+										{text ?? (
+											<span class="text-ink-muted" aria-label="No value">
+												—
+											</span>
+										)}
+									</td>
+								);
+							})}
+						</tr>
+					);
+				})
+			}
+		</tbody>
+	</table>
+</div>

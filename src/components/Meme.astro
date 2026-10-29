@@ -1,0 +1,67 @@
+---
+// A classic meme: a photo with top and bottom captions in heavy outlined capitals.
+// The captions scale with the image (container units), so the meme reads the same at any width.
+// Draw extras over the photo in the "overlay" slot, in the image's own pixel coordinates.
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+
+interface Props {
+	image: ImageMetadata;
+	alt: string;
+	top?: string;
+	bottom?: string;
+	// Credit for a found photo, shown under the meme
+	credit?: { label: string; href: string };
+	class?: string;
+}
+
+const { image, alt, top, bottom, credit, class: className } = Astro.props;
+const captionClass =
+	'meme-caption absolute inset-x-[4%] text-center text-[5.4cqw] leading-[1.05] font-bold text-white uppercase';
+---
+
+<figure class:list={['not-prose my-10', className]}>
+	<div class="@container relative overflow-hidden rounded-[20px]">
+		<Image
+			src={image}
+			alt={alt}
+			widths={[640, 960, 1280]}
+			sizes="(min-width: 1280px) 700px, 100vw"
+			class="block h-auto w-full"
+		/>
+		<svg
+			viewBox={`0 0 ${image.width} ${image.height}`}
+			class="pointer-events-none absolute inset-0 size-full"
+			aria-hidden="true"
+		>
+			<slot name="overlay" />
+		</svg>
+		{top && <p class:list={[captionClass, 'top-[3%]']}>{top}</p>}
+		{bottom && <p class:list={[captionClass, 'bottom-[4%]']}>{bottom}</p>}
+	</div>
+	{
+		credit && (
+			<figcaption class="mt-3 text-sm text-ink-muted">
+				Photo:{' '}
+				<a href={credit.href} class="underline underline-offset-[0.2em]">
+					{credit.label}
+				</a>
+			</figcaption>
+		)
+	}
+</figure>
+
+<style>
+	/* The meme look: white capitals with a hard black outline, readable on any photo */
+	.meme-caption {
+		text-shadow: /* taste-skill-ignore: meme text outline, not a shadow */
+			0.04em 0.04em 0 #000,
+			-0.04em 0.04em 0 #000,
+			0.04em -0.04em 0 #000,
+			-0.04em -0.04em 0 #000,
+			0 0.05em 0 #000,
+			0 -0.05em 0 #000,
+			0.05em 0 0 #000,
+			-0.05em 0 0 #000;
+	}
+</style>

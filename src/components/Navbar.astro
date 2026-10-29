@@ -1,0 +1,30 @@
+---
+import { LEVELS, PATHS, SITE_NAME, type Level } from '../config/site';
+
+interface Props {
+	current?: Level;
+}
+
+const { current } = Astro.props;
+---
+
+<header class="px-page">
+	<nav aria-label="Main" class="flex items-center justify-between py-6 text-lg">
+		<div data-reveal><a href="/" class="font-bold tracking-tight link">{SITE_NAME}</a></div>
+		<ul class="flex gap-8">
+			{
+				LEVELS.map((level, i) => (
+					<li data-reveal style={`--i: ${i + 1}`}>
+						<a
+							href={PATHS[level].href}
+							aria-current={level === current ? 'page' : undefined}
+							class="text-ink-soft link aria-[current=page]:text-ink aria-[current=page]:decoration-current"
+						>
+							{PATHS[level].label}
+						</a>
+					</li>
+				))
+			}
+		</ul>
+	</nav>
+</header>

@@ -1,0 +1,56 @@
+---
+// Shared shell for code: a surface panel with the language and a Copy button.
+// Use CodeBlock for code in .astro files; Markdown code fences reach it through CodePre.
+// The Copy button renders as static HTML; scripts/copy.ts wires up its click.
+import { Button } from '@/components/ui/button';
+
+interface Props {
+	lang?: string;
+	class?: string;
+}
+
+const LANGUAGE_NAMES: Record<string, string> = {
+	sql: 'SQL',
+	js: 'JavaScript',
+	javascript: 'JavaScript',
+	ts: 'TypeScript',
+	typescript: 'TypeScript',
+	json: 'JSON',
+	bash: 'Shell',
+	sh: 'Shell',
+	shell: 'Shell',
+	html: 'HTML',
+	css: 'CSS',
+	python: 'Python',
+	py: 'Python',
+	cypher: 'Cypher',
+};
+
+// Plain text blocks show no language label
+const UNLABELLED = new Set(['plaintext', 'text', 'txt']);
+
+const { lang, class: className } = Astro.props;
+const languageName = lang && !UNLABELLED.has(lang) ? (LANGUAGE_NAMES[lang] ?? lang) : undefined;
+---
+
+<figure
+	class:list={[
+		'not-prose my-8 overflow-hidden rounded-[20px] bg-surface',
+		'[&_pre]:overflow-x-auto [&_pre]:px-6 [&_pre]:pt-1 [&_pre]:pb-5 [&_pre]:font-mono [&_pre]:text-[15px] [&_pre]:leading-[1.65]', // taste-skill-ignore: real code
+		className,
+	]}
+	data-code-frame
+>
+	<div class="flex min-h-12 items-center justify-between gap-4 pt-2 pr-3 pl-6">
+		<span class="text-sm text-ink-muted">{languageName}</span>
+		<Button type="button" variant="secondary" size="sm" data-copy-code>Copy</Button>
+		<span class="sr-only" aria-live="polite" data-copy-status></span>
+	</div>
+	<slot />
+</figure>
+
+<script>
+	import { initCopyButtons } from '../scripts/copy';
+
+	initCopyButtons();
+</script>

@@ -1,0 +1,64 @@
+---
+// Product names as chips with their logos. Wrap a tight Markdown list of names:
+//
+//   <BrandList>
+//
+//   - PostgreSQL
+//   - MySQL
+//
+//   </BrandList>
+//
+// Logos come from src/config/brands.ts; a name without one shows as text only.
+// The list stays plain Markdown, so "Copy page" hands it to AI models as is.
+import { brandIcon } from '../config/brands';
+
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+
+const logo = (path: string): string =>
+	`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${path}"/></svg>`;
+
+const html = await Astro.slots.render('default');
+const chips = html.replace(/<li>([^<]+)<\/li>/g, (match, name: string) => {
+	const icon = brandIcon(name);
+	return icon ? `<li>${logo(icon.path)}<span>${name.trim()}</span></li>` : match;
+});
+---
+
+<div class:list={['brands not-prose my-6', className]}>
+	<Fragment set:html={chips} />
+</div>
+
+<style>
+	.brands :global(ul) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.brands :global(li) {
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 52px;
+		padding: 0 20px 0 16px;
+		border-radius: 999px;
+		background: var(--color-raised);
+		color: var(--color-ink);
+		font-size: 16px;
+		font-weight: 600;
+	}
+
+	.brands :global(svg) {
+		width: 26px;
+		height: 26px;
+		flex-shrink: 0;
+		fill: currentColor;
+	}
+</style>

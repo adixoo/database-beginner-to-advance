@@ -1,0 +1,116 @@
+---
+title: What is a database
+description: A database is an organised collection of data that a program can store, find and change quickly and safely.
+level: beginner
+order: 1
+---
+
+import RowColumnCell from '@/components/graphics/RowColumnCell.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+## What is a database
+
+A database is an organised collection of data that a program can store, find and change quickly and safely. Almost every app you use keeps its data in one: your messages, your bank balance, the songs in a playlist, the items in a shopping basket.
+
+## How data is stored in a database
+
+Most databases you will meet store data in **tables**. A table looks like a spreadsheet sheet with stricter rules. Here is a table called `books`:
+
+|  ID | Title                | Author           | Year |
+| --: | -------------------- | ---------------- | ---: |
+|   1 | Nineteen Eighty-Four | George Orwell    | 1949 |
+|   2 | The Hobbit           | J. R. R. Tolkien | 1937 |
+|   3 | Things Fall Apart    | Chinua Achebe    | 1958 |
+|   4 | Brave New World      | Aldous Huxley    | 1932 |
+
+- A **table** holds one kind of thing: books, customers, orders.
+- The `id` column is the **primary key**: a value that is different for every row, so each book can be found without confusion, even if two books share a title.
+
+## What is a row, column and cell
+
+A table is a grid, and each part of the grid has a name. Using the `books` table above:
+
+<RowColumnCell />
+
+## How to work with a database
+
+You talk to most databases in **SQL** (Structured Query Language). A request is called a **query**. This one asks for books published before 1950, oldest first:
+
+```sql
+-- Books published before 1950, oldest first
+SELECT title, year
+FROM books
+WHERE year < 1950
+ORDER BY year;
+```
+
+The database answers with a new, smaller table:
+
+| Title                | Year |
+| -------------------- | ---: |
+| Brave New World      | 1932 |
+| The Hobbit           | 1937 |
+| Nineteen Eighty-Four | 1949 |
+
+It reads almost like English:
+
+- `SELECT title, year` picks the columns you want back.
+- `FROM books` names the table to look in.
+- `WHERE year < 1950` keeps only the rows that match.
+- `ORDER BY year` sorts the result.
+
+## What is a DBMS
+
+A **database management system** (DBMS) is the software that runs a database. The database is the data itself; the DBMS is the program that looks after it. Your app never opens the data files directly: it sends a query to the DBMS, and the DBMS sends back the answer.
+
+A DBMS does four jobs for you:
+
+- **Stores the data** on disk in a layout built for fast lookups.
+- **Runs your queries**, working out the quickest way to answer each one.
+- **Keeps the data correct**, refusing anything that breaks the rules you set and never leaving a change half done.
+- **Controls access**, so each user or app can only read and change what it is allowed to.
+
+Popular ones you will hear about often, with where to install them:
+
+| DBMS                 | Kind       | Install                                                                                |
+| -------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| SQLite               | Relational | [Download SQLite](https://www.sqlite.org/download.html)                                |
+| PostgreSQL           | Relational | [Download PostgreSQL](https://www.postgresql.org/download/)                            |
+| MySQL                | Relational | [Download MySQL](https://dev.mysql.com/downloads/mysql/)                               |
+| MariaDB              | Relational | [Download MariaDB](https://mariadb.org/download/)                                      |
+| Microsoft SQL Server | Relational | [Download SQL Server](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) |
+| Oracle Database      | Relational | [Get Oracle Database Free](https://www.oracle.com/database/free/get-started/)          |
+| MongoDB              | Document   | [Download MongoDB](https://www.mongodb.com/try/download/community)                     |
+| Redis                | Key-value  | [Download Redis](https://redis.io/downloads/)                                          |
+
+- **SQLite** keeps a whole database in a single file. It is built into every Android phone and iPhone, and it is the easiest place to start.
+- **PostgreSQL** and **MySQL** run as servers that many apps connect to at once. They power a large share of the web.
+
+The **relational** ones store data in tables and speak SQL. MongoDB stores data as documents and Redis as key-value pairs; you will meet those kinds later on.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Cell**
+  Where a row meets a column. It holds a single value.
+- **Column**
+  One detail that every row has, such as the year.
+- **Database**
+  An organised collection of data that a program can store, find and change.
+- **DBMS**
+  The software that stores the data and runs your queries.
+- **Primary key**
+  A column whose value is different in every row, such as id.
+- **Query**
+  A request to read or change data.
+- **Relational**
+  A kind of database that keeps data in tables and speaks SQL.
+- **Row**
+  One record in a table: everything about one book.
+- **SQL**
+  The language you write queries in.
+- **Table**
+  A grid of records of one kind, such as books or customers.
+
+</WordsToKnow>

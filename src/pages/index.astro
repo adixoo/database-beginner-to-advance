@@ -1,0 +1,19 @@
+---
+import Footer from '../components/Footer.astro';
+import Hero from '../components/Hero.astro';
+import Navbar from '../components/Navbar.astro';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+	title="learndb · Learn about databases"
+	description="Learn about databases. Start as a beginner, or go straight to advanced."
+>
+	<div id="top" class="flex flex-col lg:min-h-svh">
+		<Navbar />
+		<main class="flex flex-1 flex-col">
+			<Hero />
+		</main>
+	</div>
+	<Footer />
+</Layout>

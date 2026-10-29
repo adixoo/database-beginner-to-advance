@@ -1,0 +1,31 @@
+---
+// "Copy page" and "Copy topics": Markdown for pasting into an AI model.
+// The text sits in <template>s; scripts/copy.ts copies it and makes its links absolute.
+import { Button } from '@/components/ui/button';
+
+interface Props {
+	pageMarkdown: string;
+	topicsMarkdown: string;
+	class?: string;
+}
+
+const { pageMarkdown, topicsMarkdown, class: className } = Astro.props;
+---
+
+<div class:list={['flex flex-wrap items-center gap-2', className]}>
+	<Button type="button" variant="secondary" size="sm" data-copy-source="page-markdown">
+		Copy page
+	</Button>
+	<Button type="button" variant="secondary" size="sm" data-copy-source="topics-markdown">
+		Copy topics
+	</Button>
+	<span class="sr-only" aria-live="polite" data-copy-status></span>
+	<template id="page-markdown" set:text={pageMarkdown} />
+	<template id="topics-markdown" set:text={topicsMarkdown} />
+</div>
+
+<script>
+	import { initCopyButtons } from '../scripts/copy';
+
+	initCopyButtons();
+</script>

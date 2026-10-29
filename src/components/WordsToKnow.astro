@@ -1,0 +1,109 @@
+---
+// Glossary as library catalogue divider cards: one card per word, and the first card of each
+// letter carries a filing tab with that letter, stepping left, centre, right like real dividers.
+// Wrap a tight Markdown list, in alphabetical order; each item is a bold term with its
+// description on the next line:
+//
+//   <WordsToKnow>
+//
+//   - **Row**
+//     One record in a table.
+//
+//   </WordsToKnow>
+//
+// The list stays plain Markdown, so "Copy page" hands it to AI models as is.
+
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+
+// The letter shown on a card's tab: the first character of its term
+const tabLetter = (termHtml: string): string => {
+	const letter = termHtml
+		.replace(/<[^>]+>/g, '')
+		.trim()
+		.charAt(0)
+		.toUpperCase();
+	return /[\p{L}\p{N}]/u.test(letter) ? letter : '';
+};
+
+const html = await Astro.slots.render('default');
+let previousLetter = '';
+let letterGroup = -1;
+const cards = html.replace(/<li>\s*<strong>([\s\S]*?)<\/strong>/g, (_, term: string) => {
+	const letter = tabLetter(term);
+	if (!letter || letter === previousLetter) return `<li><strong>${term}</strong>`;
+	previousLetter = letter;
+	letterGroup += 1;
+	const position = letterGroup % 3;
+	return `<li><span data-tab="${position}" aria-hidden="true">${letter}</span><strong>${term}</strong>`;
+});
+---
+
+<div class:list={['words not-prose my-10', className]}>
+	<Fragment set:html={cards} />
+</div>
+
+<style>
+	.words :global(ul) {
+		display: grid;
+		gap: 44px 12px;
+		margin: 0;
+		padding: 28px 0 0;
+		list-style: none;
+	}
+
+	@media (min-width: 640px) {
+		.words :global(ul) {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	.words :global(li) {
+		position: relative;
+		padding: 24px 24px 26px;
+		border-radius: 20px;
+		background: var(--color-surface);
+		color: var(--color-ink);
+		font-size: 16px;
+		line-height: 1.45;
+	}
+
+	.words :global(strong) {
+		display: block;
+		margin-bottom: 10px;
+		color: var(--color-ink);
+		font-size: clamp(26px, 2.4vw, 32px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
+	}
+
+	/* The filing tab: same surface as its card, so card and tab read as one shape */
+	.words :global([data-tab]) {
+		position: absolute;
+		bottom: 100%;
+		left: 24px;
+		display: grid;
+		place-items: center;
+		min-width: 44px;
+		height: 28px;
+		padding: 0 12px;
+		border-radius: 10px 10px 0 0;
+		background: var(--color-surface);
+		color: var(--color-ink-soft);
+		font-size: 15px;
+		font-weight: 700;
+	}
+
+	.words :global([data-tab='1']) {
+		left: calc(50% - 22px);
+	}
+
+	.words :global([data-tab='2']) {
+		right: 24px;
+		left: auto;
+	}
+</style>

@@ -1,0 +1,41 @@
+---
+// Links to the sections of the current page. The section in view is marked as it scrolls.
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+	headings: MarkdownHeading[];
+	class?: string;
+}
+
+const { headings, class: className } = Astro.props;
+const sections = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+---
+
+{
+	sections.length > 0 && (
+		<nav class:list={['text-base', className]} aria-labelledby="on-this-page" data-on-this-page>
+			<h2 id="on-this-page" class="font-semibold">
+				On this page
+			</h2>
+			<ol class="mt-4 flex flex-col gap-1">
+				{sections.map((heading) => (
+					<li class:list={[heading.depth === 3 && 'pl-4']}>
+						<a
+							href={`#${heading.slug}`}
+							class="-mx-3 block rounded-xl px-3 py-1.5 text-ink-soft transition-colors hover:text-ink aria-current:bg-raised aria-current:font-semibold aria-current:text-ink"
+						>
+							{heading.text}
+						</a>
+					</li>
+				))}
+			</ol>
+		</nav>
+	)
+}
+
+<script>
+	import { trackActiveSection } from '../scripts/active-section';
+
+	const nav = document.querySelector<HTMLElement>('[data-on-this-page]');
+	if (nav) trackActiveSection(nav);
+</script>

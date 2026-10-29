@@ -1,0 +1,68 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import Markdown from '../../components/Markdown.astro';
+import OnThisPage from '../../components/OnThisPage.astro';
+import PageActions from '../../components/PageActions.astro';
+import { MDX_COMPONENTS } from '../../components/markdown';
+import { PATHS } from '../../config/site';
+import LevelLayout from '../../layouts/LevelLayout.astro';
+import {
+	getTopics,
+	topicSlug,
+	topicsToMarkdown,
+	topicToMarkdown,
+	type Topic,
+} from '../../lib/topics';
+
+export const getStaticPaths = (async () => {
+	const topics = await getTopics();
+	return topics.map((topic) => ({
+		params: { level: topic.data.level, topic: topicSlug(topic) },
+		props: { topic },
+	}));
+}) satisfies GetStaticPaths;
+
+interface Props {
+	topic: Topic;
+}
+
+const { topic } = Astro.props;
+const { level } = topic.data;
+const { Content, headings } = await render(topic);
+const levelTopics = await getTopics(level);
+---
+
+<LevelLayout
+	level={level}
+	title={topic.data.title}
+	description={topic.data.description}
+	currentTopic={topic.id}
+>
+	<div
+		class="xl:grid xl:grid-cols-[minmax(0,64ch)_240px] xl:justify-between xl:gap-12 2xl:grid-cols-[minmax(0,64ch)_280px]"
+	>
+		<article class="max-w-[64ch]">
+			<div class="mb-8 flex flex-wrap items-center justify-between gap-4">
+				<Breadcrumb
+					items={[
+						{ label: PATHS[level].label, href: PATHS[level].href },
+						{ label: topic.data.title },
+					]}
+				/>
+				<PageActions
+					pageMarkdown={topicToMarkdown(topic)}
+					topicsMarkdown={topicsToMarkdown(level, levelTopics)}
+				/>
+			</div>
+			<h1 class="text-[clamp(44px,6vw,88px)] leading-[0.95] font-bold tracking-[-0.03em]">
+				{topic.data.title}
+			</h1>
+			<Markdown class="mt-10">
+				<Content components={MDX_COMPONENTS} />
+			</Markdown>
+		</article>
+		<OnThisPage headings={headings} class="hidden self-start xl:sticky xl:top-8 xl:block" />
+	</div>
+</LevelLayout>

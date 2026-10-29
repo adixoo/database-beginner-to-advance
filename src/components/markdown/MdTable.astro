@@ -1,0 +1,15 @@
+---
+// Replaces <table> in rendered MDX with the same look as the Table component.
+import { TABLE_CLASSES } from '../table-styles';
+---
+
+<div
+	class:list={['not-prose my-8', TABLE_CLASSES.frame]}
+	role="region"
+	aria-label="Table"
+	tabindex="0"
+>
+	<table class:list={[TABLE_CLASSES.table, TABLE_CLASSES.links]}>
+		<slot />
+	</table>
+</div>

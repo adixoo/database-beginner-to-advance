@@ -1,0 +1,11 @@
+---
+import { TABLE_CLASSES, bodyToneClass, isRightAligned } from '../table-styles';
+
+interface Props {
+	style?: unknown;
+}
+
+const numeric = isRightAligned(Astro.props.style);
+---
+
+<td class:list={[TABLE_CLASSES.bodyCell, bodyToneClass(numeric)]}><slot /></td>

@@ -1,0 +1,19 @@
+---
+// Highlighted code with a Copy button, for use in .astro files:
+// <CodeBlock lang="sql" code={`SELECT * FROM books;`} />
+import { Code } from 'astro:components';
+import type { ComponentProps } from 'astro/types';
+import CodeFrame from './CodeFrame.astro';
+
+interface Props {
+	code: string;
+	lang?: ComponentProps<typeof Code>['lang'];
+	class?: string;
+}
+
+const { code, lang = 'plaintext', class: className } = Astro.props;
+---
+
+<CodeFrame lang={typeof lang === 'string' ? lang : undefined} class={className}>
+	<Code code={code} lang={lang} theme="css-variables" />
+</CodeFrame>

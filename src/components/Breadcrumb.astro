@@ -1,0 +1,43 @@
+---
+// Trail of links back up the site. The last item is the current page.
+
+export interface Crumb {
+	label: string;
+	href?: string;
+}
+
+interface Props {
+	items: Crumb[];
+	class?: string;
+}
+
+const { items, class: className } = Astro.props;
+---
+
+<nav aria-label="Breadcrumb" class:list={['text-base', className]}>
+	<ol class="flex flex-wrap items-center gap-x-2 gap-y-1">
+		{
+			items.map((item, index) => {
+				const isCurrent = index === items.length - 1;
+				return (
+					<li class="flex items-center gap-2">
+						{index > 0 && (
+							<span class="text-ink-muted" aria-hidden="true">
+								/
+							</span>
+						)}
+						{isCurrent || !item.href ? (
+							<span class="text-ink" aria-current={isCurrent ? 'page' : undefined}>
+								{item.label}
+							</span>
+						) : (
+							<a href={item.href} class="text-ink-soft link hover:text-ink">
+								{item.label}
+							</a>
+						)}
+					</li>
+				);
+			})
+		}
+	</ol>
+</nav>

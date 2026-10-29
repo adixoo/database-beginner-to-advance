@@ -1,0 +1,49 @@
+---
+import { Image } from 'astro:assets';
+import drawer from '../assets/card-catalogue-drawer.jpg';
+import { buttonVariants } from '@/components/ui/button';
+import { PATHS } from '../config/site';
+---
+
+<section
+	class="flex flex-1 flex-col justify-end px-page pt-20 pb-24 lg:pt-16 lg:pb-[clamp(48px,9svh,112px)]"
+>
+	<h1
+		class="text-[14vw] leading-[0.95] font-bold tracking-[-0.03em] text-ink lg:text-[min(12vw,184px)]"
+		aria-label="Learn about databases"
+	>
+		<span class="block" data-reveal>Learn about</span>
+		<span class="block whitespace-nowrap" data-reveal style="--i: 1">
+			<span
+				data-shutter
+				class="relative mr-[0.06em] inline-block h-[0.72em] w-[1.5em] overflow-hidden rounded-[0.12em] align-baseline sm:w-[2.2em]"
+			>
+				<Image
+					src={drawer}
+					alt="An open drawer of a library card catalogue, full of index cards"
+					widths={[240, 480, 800]}
+					sizes="(min-width: 640px) 26vw, 19vw"
+					loading="eager"
+					fetchpriority="high"
+					class="absolute inset-0 size-full object-cover object-[42%_58%]"
+				/>
+			</span>
+			databases
+		</span>
+	</h1>
+
+	<p
+		class="mt-10 max-w-[30ch] text-[clamp(20px,1.8vw,26px)] leading-snug text-ink"
+		data-reveal
+		style="--i: 2"
+	>
+		Start as a beginner, or go straight to advanced.
+	</p>
+
+	<div class="mt-8 flex flex-wrap gap-3" data-reveal style="--i: 3">
+		<a href={PATHS.beginner.href} class={buttonVariants({ size: 'lg' })}> Start as beginner </a>
+		<a href={PATHS.advanced.href} class={buttonVariants({ variant: 'secondary', size: 'lg' })}>
+			Start advanced
+		</a>
+	</div>
+</section>

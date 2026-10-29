@@ -1,0 +1,195 @@
+---
+// A simplified Instagram as three linked tables. Columns that hold the same kind of key share
+// a colour (mint: user ids, sky: post ids), and arrows with handwritten notes say what each link
+// means. Static, no motion. Below ~600px wide it scrolls sideways.
+
+interface TableSpec {
+	name: string;
+	x: number;
+	y: number;
+	width: number;
+	columns: { label: string; x: number; key?: 'user' | 'post' }[];
+	rows: string[][];
+	// Highlighted key columns: left edge and width of the tint, in SVG units
+	tints: { x: number; width: number; key: 'user' | 'post' }[];
+}
+
+const NAME_BASELINE = 25;
+const HEADER_BASELINE = 58;
+const HEADER_RULE = 68;
+const ROW_HEIGHT = 32;
+const FRAME_HEIGHT = 172;
+
+const KEY_COLOUR = { user: 'var(--color-mint)', post: 'var(--color-sky)' } as const;
+
+const TABLES: TableSpec[] = [
+	{
+		name: 'users',
+		x: 20,
+		y: 50,
+		width: 300,
+		columns: [
+			{ label: 'id', x: 40, key: 'user' },
+			{ label: 'username', x: 84 },
+			{ label: 'name', x: 216 },
+		],
+		rows: [
+			['1', 'asha.codes', 'Asha'],
+			['2', 'ravi.clicks', 'Ravi'],
+			['3', 'meera.eats', 'Meera'],
+		],
+		tints: [{ x: 30, width: 40, key: 'user' }],
+	},
+	{
+		name: 'posts',
+		x: 440,
+		y: 50,
+		width: 300,
+		columns: [
+			{ label: 'id', x: 460, key: 'post' },
+			{ label: 'user_id', x: 506, key: 'user' },
+			{ label: 'caption', x: 578 },
+		],
+		rows: [
+			['101', '1', 'Sunset at the beach'],
+			['102', '2', 'First latte art'],
+			['103', '1', 'Weekend trek'],
+		],
+		tints: [
+			{ x: 452, width: 44, key: 'post' },
+			{ x: 498, width: 66, key: 'user' },
+		],
+	},
+	{
+		name: 'likes',
+		x: 250,
+		y: 300,
+		width: 260,
+		columns: [
+			{ label: 'post_id', x: 270, key: 'post' },
+			{ label: 'user_id', x: 370, key: 'user' },
+		],
+		rows: [
+			['101', '2'],
+			['101', '3'],
+			['102', '1'],
+		],
+		tints: [
+			{ x: 262, width: 76, key: 'post' },
+			{ x: 362, width: 76, key: 'user' },
+		],
+	},
+];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Instagram tables diagram" tabindex="0">
+		<svg
+			viewBox="0 34 760 456"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="ig-title ig-desc"
+		>
+			<title id="ig-title">A simplified Instagram stored as three linked tables</title>
+			<desc id="ig-desc">
+				The users table has id, username and name. The posts table has id, user_id and caption; its
+				user_id points to the user who posted it. The likes table has post_id and user_id; post_id
+				points to the post that was liked and user_id to the user who liked it.
+			</desc>
+
+			{
+				TABLES.map((table) => (
+					<g font-family="var(--font-sans)">
+						<rect
+							x={table.x}
+							y={table.y}
+							width={table.width}
+							height={FRAME_HEIGHT}
+							rx="14"
+							fill="var(--color-surface)"
+						/>
+						{table.tints.map((tint) => (
+							<rect
+								x={tint.x}
+								y={table.y + HEADER_RULE + 2}
+								width={tint.width}
+								height={ROW_HEIGHT * table.rows.length - 4}
+								rx="6"
+								fill={KEY_COLOUR[tint.key]}
+								fill-opacity="0.16"
+							/>
+						))}
+						<text
+							x={table.x + 20}
+							y={table.y + NAME_BASELINE}
+							font-size="17"
+							font-weight="700"
+							fill="var(--color-ink)"
+						>
+							{table.name}
+						</text>
+						{table.columns.map((column) => (
+							<text
+								x={column.x}
+								y={table.y + HEADER_BASELINE}
+								font-size="13"
+								font-weight={column.key ? 600 : 400}
+								fill={column.key ? KEY_COLOUR[column.key] : 'var(--color-ink-muted)'}
+							>
+								{column.label}
+							</text>
+						))}
+						<line
+							x1={table.x + 16}
+							y1={table.y + HEADER_RULE}
+							x2={table.x + table.width - 16}
+							y2={table.y + HEADER_RULE}
+							stroke="var(--color-gray-700)"
+						/>
+						{table.rows.map((row, rowIndex) =>
+							row.map((value, columnIndex) => {
+								const key = table.columns[columnIndex].key;
+								return (
+									<text
+										x={table.columns[columnIndex].x}
+										y={table.y + HEADER_RULE + rowIndex * ROW_HEIGHT + 21}
+										font-size="15"
+										font-weight={key ? 600 : 400}
+										fill={key ? KEY_COLOUR[key] : 'var(--color-ink-soft)'}
+									>
+										{value}
+									</text>
+								);
+							}),
+						)}
+					</g>
+				))
+			}
+
+			<!-- Links: each arrow points from the column holding a key to the table it belongs to -->
+			<g
+				fill="none"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<g stroke="var(--color-mint)">
+					<path d="M440 168 C 410 160, 360 160, 326 168"></path>
+					<path d="M326 168 l11.5 3.5 M326 168 l8.7 -8.2"></path>
+					<path d="M290 298 C 280 262, 230 250, 204 230"></path>
+					<path d="M204 230 l4.6 11.1 M204 230 l11.9 1.6"></path>
+				</g>
+				<g stroke="var(--color-sky)">
+					<path d="M470 298 C 480 262, 530 250, 556 230"></path>
+					<path d="M556 230 l-4.6 11.1 M556 230 l-11.9 1.6"></path>
+				</g>
+			</g>
+			<g font-family="var(--font-hand)" font-size="24" font-weight="600" fill="var(--color-butter)">
+				<text x="383" y="150" text-anchor="middle">who posted it</text>
+				<text x="196" y="280" text-anchor="end">who liked it</text>
+				<text x="564" y="280">which post</text>
+			</g>
+		</svg>
+	</div>
+</figure>

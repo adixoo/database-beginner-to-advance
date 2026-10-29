@@ -1,0 +1,11 @@
+---
+import { TABLE_CLASSES, headerAlignClass, isRightAligned } from '../table-styles';
+
+interface Props {
+	style?: unknown;
+}
+
+const numeric = isRightAligned(Astro.props.style);
+---
+
+<th scope="col" class:list={[TABLE_CLASSES.headerCell, headerAlignClass(numeric)]}><slot /></th>

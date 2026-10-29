@@ -1,0 +1,149 @@
+---
+// The `books` table with one row, one column and their shared cell highlighted, each pointed
+// at by a handwritten note (DESIGN.md annotation: target, arrow, note). Drawn as one SVG so
+// the arrows stay locked to the cells at any width; below ~600px it scrolls sideways.
+
+const COLUMNS = [
+	{ label: 'ID', x: 160, anchor: 'end' },
+	{ label: 'Title', x: 192, anchor: 'start' },
+	{ label: 'Author', x: 376, anchor: 'start' },
+	{ label: 'Year', x: 574, anchor: 'end' },
+] as const;
+
+const ROWS = [
+	['1', 'Nineteen Eighty-Four', 'George Orwell', '1949'],
+	['2', 'The Hobbit', 'J. R. R. Tolkien', '1937'],
+	['3', 'Things Fall Apart', 'Chinua Achebe', '1958'],
+	['4', 'Brave New World', 'Aldous Huxley', '1932'],
+] as const;
+
+const HEADER_BASELINE = 92;
+const ROW_TOP = 108;
+const ROW_HEIGHT = 44;
+// Which row and column the graphic points at (The Hobbit, Year)
+const ROW_INDEX = 1;
+const COLUMN_INDEX = 3;
+
+const rowBaseline = (index: number): number => ROW_TOP + index * ROW_HEIGHT + 28;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Row, column and cell diagram" tabindex="0">
+		<svg
+			viewBox="0 0 720 300"
+			class="w-full min-w-[560px]"
+			role="img"
+			aria-labelledby="rcc-title rcc-desc"
+		>
+			<title id="rcc-title">A row, a column and a cell in the books table</title>
+			<desc id="rcc-desc">
+				The row for The Hobbit is highlighted as a row. The Year column is highlighted as a column.
+				The cell where they meet, holding 1937, is highlighted as a cell.
+			</desc>
+
+			<!-- Table frame -->
+			<rect x="110" y="60" width="480" height="230" rx="14" fill="var(--color-surface)"></rect>
+
+			<!-- Highlights: column (sky), row (mint), cell (peach) -->
+			<rect
+				x="524"
+				y="66"
+				width="62"
+				height="220"
+				rx="8"
+				fill="var(--color-sky)"
+				fill-opacity="0.16"></rect>
+			<rect
+				x="114"
+				y={ROW_TOP + ROW_INDEX * ROW_HEIGHT + 2}
+				width="472"
+				height={ROW_HEIGHT - 4}
+				rx="8"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"></rect>
+			<rect
+				x="526"
+				y={ROW_TOP + ROW_INDEX * ROW_HEIGHT + 4}
+				width="58"
+				height={ROW_HEIGHT - 8}
+				rx="6"
+				fill="var(--color-peach)"
+				fill-opacity="0.18"
+				stroke="var(--color-peach)"
+				stroke-width="2"></rect>
+
+			<!-- Table rules -->
+			<line x1="126" y1={ROW_TOP} x2="574" y2={ROW_TOP} stroke="var(--color-gray-700)"></line>
+			{
+				ROWS.slice(1).map((_, index) => {
+					const y = ROW_TOP + (index + 1) * ROW_HEIGHT;
+					return <line x1="126" y1={y} x2="574" y2={y} stroke="var(--color-gray-800)" />;
+				})
+			}
+
+			<!-- Header and cells -->
+			<g font-family="var(--font-sans)" font-size="16">
+				{
+					COLUMNS.map((column) => (
+						<text
+							x={column.x}
+							y={HEADER_BASELINE}
+							text-anchor={column.anchor}
+							fill="var(--color-ink-muted)"
+							font-size="15"
+						>
+							{column.label}
+						</text>
+					))
+				}
+				{
+					ROWS.map((row, rowIndex) =>
+						row.map((value, columnIndex) => {
+							const isCell = rowIndex === ROW_INDEX && columnIndex === COLUMN_INDEX;
+							const isNumber = columnIndex === 0 || columnIndex === COLUMN_INDEX;
+							return (
+								<text
+									x={COLUMNS[columnIndex].x}
+									y={rowBaseline(rowIndex)}
+									text-anchor={COLUMNS[columnIndex].anchor}
+									fill={
+										isCell
+											? 'var(--color-peach)'
+											: isNumber
+												? 'var(--color-ink)'
+												: 'var(--color-ink-soft)'
+									}
+									font-weight={isCell || isNumber ? 600 : 400}
+								>
+									{value}
+								</text>
+							);
+						}),
+					)
+				}
+			</g>
+
+			<!-- Annotations: arrows end 14-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M500 32 C 526 26, 548 34, 552 54"></path>
+				<path d="M552 54 l-7.9 -9 M552 54 l3.9 -11.4"></path>
+				<path d="M44 210 C 52 186, 76 176, 100 174"></path>
+				<path d="M100 174 l-9.9 6.9 M100 174 l-10.9 -5.1"></path>
+				<path d="M636 238 C 640 212, 622 190, 600 182"></path>
+				<path d="M600 182 l11.8 -2.1 M600 182 l7.7 9.2"></path>
+			</g>
+			<g font-family="var(--font-hand)" font-size="30" font-weight="600" fill="var(--color-butter)">
+				<text x="494" y="40" text-anchor="end">a column</text>
+				<text x="12" y="236">a row</text>
+				<text x="606" y="266">a cell</text>
+			</g>
+		</svg>
+	</div>
+</figure>

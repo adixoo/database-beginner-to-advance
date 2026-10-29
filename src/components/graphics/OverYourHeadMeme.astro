@@ -1,0 +1,38 @@
+---
+// "Went right over my head": everything at once flies just above a confused head.
+import confusedMan from '../../assets/memes/confused-man.jpg';
+import Meme from '../Meme.astro';
+---
+
+<Meme
+	image={confusedMan}
+	alt="A young man staring blankly at the camera while an arrow labelled whoosh flies just over his head"
+	top="7 database types at once"
+	bottom="Went right over my head"
+	credit={{
+		label: '“Confused Man with a Camera” by Mike8411251995, public domain, via Wikimedia Commons',
+		href: 'https://commons.wikimedia.org/wiki/File:Confused_Man_with_a_Camera.JPG',
+	}}
+>
+	<g
+		slot="overlay"
+		fill="none"
+		stroke="var(--color-on-accent)"
+		stroke-width="10"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d="M120 420 C 260 150, 980 130, 1140 380"></path>
+		<path d="M1140 380 l-30.2 -15.6 M1140 380 l-1.5 -34"></path>
+		<text
+			x="930"
+			y="250"
+			fill="var(--color-on-accent)"
+			stroke="none"
+			font-family="var(--font-hand)"
+			font-size="72"
+			font-weight="600"
+			transform="rotate(12 930 250)">whoosh</text
+		>
+	</g>
+</Meme>

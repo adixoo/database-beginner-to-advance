@@ -1,0 +1,13 @@
+---
+// Replaces <pre> in rendered MDX (see the topic page) so code fences get the CodeFrame.
+import type { HTMLAttributes } from 'astro/types';
+import CodeFrame from './CodeFrame.astro';
+
+type Props = HTMLAttributes<'pre'> & { 'data-language'?: string };
+
+const { 'data-language': lang, ...rest } = Astro.props;
+---
+
+<CodeFrame lang={lang}>
+	<pre {...rest} data-language={lang}><slot /></pre>
+</CodeFrame>

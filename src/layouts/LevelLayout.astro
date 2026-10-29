@@ -1,0 +1,36 @@
+---
+import Footer from '../components/Footer.astro';
+import Navbar from '../components/Navbar.astro';
+import TopicsSidebar from '../components/TopicsSidebar.astro';
+import { SITE_NAME, type Level } from '../config/site';
+import Layout from './Layout.astro';
+
+interface Props {
+	level: Level;
+	title: string;
+	description: string;
+	// Topic id to mark as current in the sidebar
+	currentTopic?: string;
+}
+
+const { level, title, description, currentTopic } = Astro.props;
+---
+
+<Layout title={`${title} · ${SITE_NAME}`} description={description}>
+	<div id="top" class="flex flex-col lg:min-h-svh">
+		<Navbar current={level} />
+		<div
+			class="grid flex-1 items-start gap-10 px-page pt-12 pb-24 lg:grid-cols-[minmax(240px,320px)_1fr] lg:gap-16 lg:pt-20"
+		>
+			<main class="min-w-0 lg:col-start-2 lg:row-start-1">
+				<slot />
+			</main>
+			<TopicsSidebar
+				level={level}
+				currentTopic={currentTopic}
+				class="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1"
+			/>
+		</div>
+	</div>
+	<Footer />
+</Layout>

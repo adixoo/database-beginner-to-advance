@@ -1,0 +1,111 @@
+---
+title: Types of database
+description: Databases come in two big families, SQL and NoSQL, and the difference is how they shape data.
+level: beginner
+order: 2
+---
+
+import BrandList from '@/components/BrandList.astro';
+import InstagramTables from '@/components/graphics/InstagramTables.astro';
+import OverYourHeadMeme from '@/components/graphics/OverYourHeadMeme.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Not every database stores data in tables. Each type shapes data in its own way, and that shape decides what it is good at. Here is a quick map:
+
+| Type        | Stores data as               | Examples                    |
+| ----------- | ---------------------------- | --------------------------- |
+| Relational  | Tables of rows and columns   | PostgreSQL, MySQL, SQLite   |
+| Document    | JSON-like documents          | MongoDB, Firestore, CouchDB |
+| Key-value   | A key and its value          | Redis, Amazon DynamoDB      |
+| Wide-column | Rows with flexible columns   | Cassandra, ScyllaDB         |
+| Graph       | Things and their links       | Neo4j, Amazon Neptune       |
+| Time-series | Values stamped with a time   | InfluxDB, TimescaleDB       |
+| Vector      | Numbers that capture meaning | pgvector, Qdrant, Pinecone  |
+
+> Don't try to learn all of these now. Trying to remember every type at once will go over your head and leave you with nothing. You only need two families to start: **SQL databases** (relational) and **NoSQL databases** (key-value, document and the other types in the table). The rest will make sense later, once these two are clear.
+
+<OverYourHeadMeme />
+
+## SQL databases
+
+A SQL database, also called a **relational** database, keeps data in **tables** with a fixed set of columns, called the **schema**. Every row must follow it. You read and change the data with SQL.
+
+Tables link to each other through keys. Take a simplified Instagram: one table for users, one for posts and one for likes. Each post stores the `user_id` of who posted it, and each like stores which post was liked and which user liked it. Columns with the same colour hold the same kind of key:
+
+<InstagramTables />
+
+**Good for:** data with a clear structure and many relationships, such as orders, payments and stock.
+
+**Examples:**
+
+<BrandList>
+
+- PostgreSQL
+- MySQL
+- SQLite
+
+</BrandList>
+
+## NoSQL databases
+
+NoSQL means "not only SQL": any database that does not store data in tables of rows and columns. The simplest kind is the **key-value** database.
+
+A key-value database works like a giant dictionary. You store a **value** under a unique **key**, and you get it back by asking for that key. There are no tables, no columns and no schema: the value can be a number, some text or a whole object. Back to our Instagram, here is what a key-value database might hold:
+
+```text
+session:8f2a      →  { "user_id": 1 }
+likes:post:101    →  2
+user:1:username   →  "asha.codes"
+```
+
+- `session:8f2a` remembers who is logged in, so Instagram does not ask for your password on every tap.
+- `likes:post:101` keeps the like count for a post, ready to show instantly.
+- `user:1:username` stores one detail for quick lookup.
+
+The catch: you can only find a value by its exact key. You cannot ask "which posts have more than 100 likes?" the way you can with SQL. In return, reading or writing by key is extremely fast, often under a millisecond, because many key-value databases keep their data in memory.
+
+**Good for:** logins and sessions, caches that keep popular data ready, counters such as likes and views, and shopping carts: anything you look up by one known name.
+
+**Examples:** Redis, Amazon DynamoDB, Memcached.
+
+## Which one should you use?
+
+| Question      | SQL                  | Key-value NoSQL          |
+| ------------- | -------------------- | ------------------------ |
+| Data shape    | Tables, fixed schema | A key and its value      |
+| How you query | SQL, any question    | Only by the exact key    |
+| Best when     | Data is linked       | Speed for simple lookups |
+
+Here is which one fits common jobs in an app like Instagram:
+
+| Case                         | Use       | Why                         |
+| ---------------------------- | --------- | --------------------------- |
+| User accounts and profiles   | SQL       | Structured and must be safe |
+| Posts and who posted them    | SQL       | Linked to users             |
+| Who liked which post         | SQL       | Links users and posts       |
+| Payments and orders          | SQL       | Must never be half done     |
+| Keeping you logged in        | Key-value | Checked on every tap        |
+| Like and view counts         | Key-value | Change and show instantly   |
+| Caching the home feed        | Key-value | Served fast, rebuilt later  |
+| Limiting requests per minute | Key-value | A quick counter per user    |
+
+If you are not sure, start with SQL. Most apps begin with a SQL database, and it teaches you the ideas every other database builds on. Many apps then add a key-value database next to it, for speed.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Cache**
+  A fast copy of data kept close by, so it can be served instantly.
+- **Key**
+  The unique name you store a value under and look it up by.
+- **NoSQL**
+  Any database that does not store data in tables of rows and columns.
+- **Relational**
+  Another name for a SQL database: data in linked tables.
+- **Schema**
+  The fixed set of columns and types a table must follow.
+- **Value**
+  The data stored under a key: a number, text or a whole object.
+
+</WordsToKnow>
