@@ -1,0 +1,20 @@
+---
+// A small pill label, coloured by what it says: <Tag>Free</Tag>, <Tag>Free plan</Tag>, <Tag>Paid</Tag>.
+// Other labels show in neutral grey. Works inline, including inside Markdown table cells.
+
+const TONES: Record<string, string> = {
+	free: 'bg-mint/14 text-mint',
+	'free plan': 'bg-butter/14 text-butter',
+	paid: 'bg-peach/14 text-peach',
+};
+
+const label = (await Astro.slots.render('default')).trim();
+const tone = TONES[label.toLowerCase()] ?? 'bg-raised text-ink-soft';
+---
+
+<span
+	class:list={[
+		'inline-flex h-7 items-center rounded-full px-3 text-sm font-semibold whitespace-nowrap',
+		tone,
+	]}><Fragment set:html={label} /></span
+>

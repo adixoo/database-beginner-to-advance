@@ -22,12 +22,15 @@ export function topicHref(topic: Topic): string {
 // whose Markdown children are kept
 const MDX_IMPORT = /^import\s.+$\n?/gm;
 const MDX_COMPONENT = /^<\/?[A-Z][\w.]*(\s[^>]*)?\/?>\s*$\n?/gm;
+// Inline components keep their text: <Tag>Free</Tag> -> Free
+const MDX_INLINE_COMPONENT = /<([A-Z][\w.]*)(\s[^>]*)?>([^<\n]*)<\/\1>/g;
 
 // The topic as plain Markdown (title plus its source without MDX code), for pasting into an AI model
 export function topicToMarkdown(topic: Topic): string {
 	const body = (topic.body ?? '')
 		.replace(MDX_IMPORT, '')
 		.replace(MDX_COMPONENT, '')
+		.replace(MDX_INLINE_COMPONENT, '$3')
 		.replace(/\n{3,}/g, '\n\n')
 		.trim();
 	return `# ${topic.data.title}\n\n${body}\n`;

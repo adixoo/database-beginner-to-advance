@@ -9,7 +9,8 @@ export const TABLE_CLASSES = {
 		'[&_a]:font-medium [&_a]:text-mint [&_a]:underline [&_a]:decoration-[0.07em] [&_a]:underline-offset-[0.2em]',
 	headerCell:
 		'border-b border-gray-700 px-3 py-3 text-sm font-medium whitespace-nowrap text-ink-muted', // taste-skill-ignore: table rule
-	bodyCell: 'border-b border-gray-800 px-3 py-3.5 whitespace-nowrap group-last:border-b-0', // taste-skill-ignore: table rule
+	// Text cells wrap so tables fit their column; figures stay on one line (bodyToneClass)
+	bodyCell: 'border-b border-gray-800 px-3 py-3.5 align-top group-last:border-b-0', // taste-skill-ignore: table rule
 } as const;
 
 // Numbers are right-aligned; their values are set as figures in full ink
@@ -17,7 +18,7 @@ export const headerAlignClass = (numeric: boolean): string =>
 	numeric ? 'text-right' : 'text-left';
 
 export const bodyToneClass = (numeric: boolean): string =>
-	numeric ? 'text-right font-semibold text-ink' : 'text-ink-soft';
+	numeric ? 'text-right font-semibold whitespace-nowrap text-ink' : 'text-ink-soft';
 
 // Markdown marks a right-aligned column (`---:`) with an inline text-align style, as a string or an object
 export const isRightAligned = (style: unknown): boolean => {

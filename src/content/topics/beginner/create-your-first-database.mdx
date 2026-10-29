@@ -5,18 +5,62 @@ level: beginner
 order: 3
 ---
 
+import Tag from '@/components/Tag.astro';
 import WordsToKnow from '@/components/WordsToKnow.astro';
 
 Let's build a tiny Instagram: a database with a table for users and a table for their posts. We will use **SQLite**, because the whole database is a single file and there is no server to set up. The SQL you write here works almost the same in PostgreSQL and MySQL.
 
-## Plan your tables
+## Plan your schema
 
-Before writing any SQL, decide what you need to store. Think in things, not screens: each kind of thing becomes a table, and each detail about it becomes a column.
+Before writing any SQL, plan your schema: decide what you need to store. Think in things, not screens: each kind of thing becomes a table, and each detail about it becomes a column.
 
 - A **user** has a username and a name.
 - A **post** has a caption, and it belongs to one user.
 
 Every table also gets an `id` column, so each row can be found by a number that never repeats.
+
+### Tools to draw your schema
+
+Sketching your tables as boxes and lines makes mistakes easy to spot before you build anything. Pen and paper works, and so do these tools:
+
+| Tool                                                                             | Price                | Good for                                              |
+| -------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------- |
+| [ChartDB](https://chartdb.io)                                                    | <Tag>Free</Tag>      | Drawing a schema, or importing one from your database |
+| [drawDB](https://www.drawdb.app)                                                 | <Tag>Free</Tag>      | Drag-and-drop editor in the browser, no account       |
+| [DBeaver Community](https://dbeaver.io/download/)                                | <Tag>Free</Tag>      | A database app that draws diagrams of your tables     |
+| [MySQL Workbench](https://www.mysql.com/products/workbench/)                     | <Tag>Free</Tag>      | The official designer for MySQL                       |
+| [dbdiagram.io](https://dbdiagram.io)                                             | <Tag>Free plan</Tag> | Typing your schema as text and getting a diagram      |
+| [DrawSQL](https://drawsql.app)                                                   | <Tag>Free plan</Tag> | Polished diagrams; free for public ones               |
+| [DbSchema](https://dbschema.com)                                                 | <Tag>Free plan</Tag> | A desktop designer for many databases                 |
+| [Lucidchart](https://www.lucidchart.com)                                         | <Tag>Free plan</Tag> | A general diagram app with database shapes            |
+| [Redgate Data Modeler](https://vertabelo.com)                                    | <Tag>Paid</Tag>      | Team data modelling; formerly called Vertabelo        |
+| [Navicat Data Modeler](https://www.navicat.com/en/products/navicat-data-modeler) | <Tag>Paid</Tag>      | A desktop modeller; it also has a free Lite edition   |
+
+Start with ChartDB or drawDB: both are free, open source and run in your browser.
+
+### Let AI draft your schema
+
+An AI assistant can turn a plain description of your app into a first schema in seconds. All three of these have a free plan:
+
+| Assistant                           | Price                | Made by   |
+| ----------------------------------- | -------------------- | --------- |
+| [ChatGPT](https://chatgpt.com)      | <Tag>Free plan</Tag> | OpenAI    |
+| [Claude](https://claude.ai)         | <Tag>Free plan</Tag> | Anthropic |
+| [Gemini](https://gemini.google.com) | <Tag>Free plan</Tag> | Google    |
+
+Copy this prompt, then change the first line to describe your own app:
+
+```text
+I am building a simplified Instagram where users write posts and like posts.
+Design a database schema for SQLite. I am a beginner, so keep it simple.
+
+For each table, list every column with its data type and its rules
+(primary key, NOT NULL, UNIQUE, foreign key).
+Explain each relationship between tables in one sentence.
+Then give me the CREATE TABLE statements.
+```
+
+AI makes mistakes, so treat its answer as a draft: check every table against your plan, and ask it "why?" about anything you do not understand. Once the schema makes sense to you, paste the SQL into a diagram tool above to see it drawn.
 
 ## Design the schema
 
