@@ -14,7 +14,15 @@ const tailwindRecommended = /** @type {import('eslint').Linter.Config} */ (
 );
 
 export default defineConfig([
-	globalIgnores(['dist/', '.astro/', 'node_modules/', '.claude/', '.changeset/', '.taste-skill/']),
+	globalIgnores([
+		'dist/',
+		'.astro/',
+		'node_modules/',
+		'.claude/',
+		'.changeset/',
+		'.taste-skill/',
+		'.vercel/',
+	]),
 
 	js.configs.recommended,
 	tseslint.configs.recommended,

@@ -25,3 +25,4 @@ pnpm-debug.log*
 
 # taste skill working files
 .taste-skill/
+.vercel
