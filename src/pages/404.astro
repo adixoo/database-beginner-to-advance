@@ -1,0 +1,85 @@
+---
+// Not found: the missing address shown as a query that comes back with 0 rows, in the site's
+// own code frame and table style. The path in the query is the one the visitor asked for (set
+// by the script; the static fallback reads /this-page).
+import CodeFrame from '../components/CodeFrame.astro';
+import Footer from '../components/Footer.astro';
+import Navbar from '../components/Navbar.astro';
+import { TABLE_CLASSES } from '../components/table-styles';
+import { buttonVariants } from '@/components/ui/button';
+import { PATHS, SITE_NAME } from '../config/site';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+	title={`Page not found · ${SITE_NAME}`}
+	description="This address does not match any page on learndb."
+>
+	<div id="top" class="flex flex-col lg:min-h-svh">
+		<Navbar />
+		<main class="flex-1 px-page pt-12 pb-24 lg:pt-20">
+			<div
+				class="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:items-center lg:gap-16"
+			>
+				<div>
+					<h1
+						class="text-[clamp(56px,10vw,152px)] leading-[0.95] font-bold tracking-[-0.03em]"
+						data-reveal
+					>
+						Page not found
+					</h1>
+					<p
+						class="mt-8 max-w-[32ch] text-[clamp(20px,1.8vw,26px)] leading-snug"
+						data-reveal
+						style="--i: 1"
+					>
+						We looked this address up and got 0 rows back. The link may be old or have a typo.
+					</p>
+					<div class="mt-10 flex flex-wrap gap-3" data-reveal style="--i: 2">
+						<a href={PATHS.beginner.href} class={buttonVariants({ size: 'lg' })}>
+							Start as beginner
+						</a>
+						<a href="/" class={buttonVariants({ variant: 'secondary', size: 'lg' })}>
+							Back to home
+						</a>
+					</div>
+				</div>
+
+				<div class="min-w-0 lg:pt-4" data-reveal style="--i: 3">
+					<CodeFrame lang="sql" class="mt-0">
+						<pre><code><span class="text-(--astro-code-token-keyword)">SELECT</span> * <span class="text-(--astro-code-token-keyword)">FROM</span> pages
+<span class="text-(--astro-code-token-keyword)">WHERE</span> path = <span class="text-(--astro-code-token-string)">'<span data-missing-path>/this-page</span>'</span>;</code></pre>
+					</CodeFrame>
+					<div class:list={['mt-4', TABLE_CLASSES.frame]}>
+						<table class={TABLE_CLASSES.table}>
+							<caption class="sr-only">Query result</caption>
+							<thead>
+								<tr>
+									<th scope="col" class:list={[TABLE_CLASSES.headerCell, 'text-left']}>path</th>
+									<th scope="col" class:list={[TABLE_CLASSES.headerCell, 'text-left']}>title</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td colspan="2" class:list={[TABLE_CLASSES.bodyCell, 'text-ink-muted']}>
+										0 rows
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</main>
+	</div>
+	<Footer />
+</Layout>
+
+<script>
+	// Show the address the visitor actually asked for, cut short if it is very long
+	const slot = document.querySelector('[data-missing-path]');
+	if (slot) {
+		const path = decodeURIComponent(location.pathname);
+		slot.textContent = path.length > 48 ? `${path.slice(0, 47)}…` : path;
+	}
+</script>
