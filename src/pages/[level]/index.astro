@@ -1,14 +1,17 @@
 ---
 import type { GetStaticPaths } from 'astro';
 import PracticeTools from '../../components/PracticeTools.astro';
+import { buttonVariants } from '@/components/ui/button';
 import { LEVELS, PATHS, type LearningPath, type Level } from '../../config/site';
 import LevelLayout from '../../layouts/LevelLayout.astro';
+import { getTopics, topicHref } from '../../lib/topics';
 
 export const getStaticPaths = (() =>
 	LEVELS.map((level) => ({ params: { level } }))) satisfies GetStaticPaths;
 
 const level = Astro.params.level as Level;
 const path: LearningPath = PATHS[level];
+const [firstTopic] = await getTopics(level);
 ---
 
 <LevelLayout level={level} title={path.label} description={path.summary}>
@@ -22,7 +25,23 @@ const path: LearningPath = PATHS[level];
 	>
 		{path.summary}
 	</p>
-	<div class="mt-12 flex max-w-xl flex-col gap-6" data-reveal style="--i: 2">
+	{
+		firstTopic && (
+			<a
+				href={topicHref(firstTopic)}
+				class:list={[buttonVariants({ size: 'lg' }), 'mt-8']}
+				data-reveal
+				style="--i: 2"
+			>
+				Start with {firstTopic.data.title}
+			</a>
+		)
+	}
+	<div
+		class="mt-12 grid items-start gap-6 lg:max-w-xl xl:max-w-none xl:grid-cols-2"
+		data-reveal
+		style="--i: 3"
+	>
 		{
 			path.prerequisites && path.prerequisites.length > 0 && (
 				<section class="rounded-[20px] bg-surface p-6" aria-labelledby="prerequisites">

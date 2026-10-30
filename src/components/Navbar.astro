@@ -1,4 +1,6 @@
 ---
+// Wordmark plus the level and tool links. From `sm` up the links sit in one row; on phones they
+// fold into a Menu button that opens a full-width list with large tap targets.
 import { ArrowUpRight01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { LEVELS, PATHS, PRACTICE_TOOLS, SITE_NAME, type Level } from '../config/site';
@@ -8,36 +10,40 @@ interface Props {
 }
 
 const { current } = Astro.props;
+
+const levelLinks = LEVELS.map((level) => ({
+	href: PATHS[level].href,
+	label: PATHS[level].label,
+	current: level === current,
+}));
 ---
 
-<header class="px-page">
+<header class="relative px-page">
 	<nav aria-label="Main" class="flex items-center justify-between gap-6 py-6 text-lg">
 		<div data-reveal><a href="/" class="font-bold tracking-tight link">{SITE_NAME}</a></div>
-		<ul class="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 sm:gap-x-8">
+
+		<ul class="hidden flex-wrap items-center justify-end gap-x-8 gap-y-2 sm:flex">
 			{
-				LEVELS.map((level, i) => (
+				levelLinks.map((link, i) => (
 					<li data-reveal style={`--i: ${i + 1}`}>
 						<a
-							href={PATHS[level].href}
-							aria-current={level === current ? 'page' : undefined}
+							href={link.href}
+							aria-current={link.current ? 'page' : undefined}
 							class="text-ink-soft link aria-[current=page]:text-ink aria-[current=page]:decoration-current"
 						>
-							{PATHS[level].label}
+							{link.label}
 						</a>
 					</li>
 				))
 			}
-			<!-- External practice tools, set apart from the levels by a thin rule -->
-			<li
-				aria-hidden="true"
-				class="hidden h-5 w-px bg-gray-700 sm:block"
-				data-reveal
-				style={`--i: ${LEVELS.length + 1}`}
-			>
-			</li>
+			<!-- External practice tools, set apart from the levels by a wider gap -->
 			{
 				PRACTICE_TOOLS.map((tool, i) => (
-					<li data-reveal style={`--i: ${LEVELS.length + i + 1}`}>
+					<li
+						class:list={[i === 0 && 'md:ml-6']}
+						data-reveal
+						style={`--i: ${LEVELS.length + i + 1}`}
+					>
 						<a
 							href={tool.href}
 							target="_blank"
@@ -57,5 +63,69 @@ const { current } = Astro.props;
 				))
 			}
 		</ul>
+
+		<!-- No data-reveal here: its transform would make the menu, not the header, the frame
+			     the full-width panel is positioned in -->
+		<details class="group sm:hidden" data-nav-menu>
+			<summary
+				class="flex h-11 cursor-pointer list-none items-center rounded-full bg-raised px-5 text-base font-semibold text-ink transition-colors hover:bg-gray-800 [&::-webkit-details-marker]:hidden"
+			>
+				<span class="group-open:hidden">Menu</span>
+				<span class="hidden group-open:inline">Close</span>
+			</summary>
+			<ul
+				class="absolute inset-x-0 top-full z-50 hidden flex-col bg-surface px-page pt-2 pb-6 group-open:flex"
+			>
+				{
+					levelLinks.map((link) => (
+						<li>
+							<a
+								href={link.href}
+								aria-current={link.current ? 'page' : undefined}
+								class="flex min-h-14 items-center text-2xl font-semibold text-ink-soft aria-[current=page]:text-ink"
+							>
+								{link.label}
+							</a>
+						</li>
+					))
+				}
+				{
+					PRACTICE_TOOLS.map((tool) => (
+						<li>
+							<a
+								href={tool.href}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="flex min-h-14 items-center gap-2 text-2xl font-semibold text-ink-soft"
+							>
+								{tool.navLabel}
+								<HugeiconsIcon
+									icon={ArrowUpRight01Icon}
+									size={22}
+									strokeWidth={2}
+									aria-hidden="true"
+								/>
+								<span class="sr-only">(opens in a new tab)</span>
+							</a>
+						</li>
+					))
+				}
+			</ul>
+		</details>
 	</nav>
 </header>
+
+<script>
+	// Close the phone menu on Escape or a tap outside it
+	const menu = document.querySelector<HTMLDetailsElement>('[data-nav-menu]');
+	if (menu) {
+		document.addEventListener('keydown', (event) => {
+			if (event.key !== 'Escape' || !menu.open) return;
+			menu.open = false;
+			menu.querySelector('summary')?.focus();
+		});
+		document.addEventListener('click', (event) => {
+			if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
+		});
+	}
+</script>

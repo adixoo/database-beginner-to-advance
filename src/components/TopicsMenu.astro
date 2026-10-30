@@ -1,0 +1,38 @@
+---
+// The level's topics folded into one row on phones and tablets, where the sidebar would only
+// appear after the whole article. Tap it to open the list; it closes when a topic is chosen.
+import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { PATHS, type Level } from '../config/site';
+import { getTopics } from '../lib/topics';
+import TopicList from './TopicList.astro';
+
+interface Props {
+	level: Level;
+	currentTopic: string;
+	class?: string;
+}
+
+const { level, currentTopic, class: className } = Astro.props;
+const topics = await getTopics(level);
+const position = topics.findIndex((topic) => topic.id === currentTopic) + 1;
+---
+
+<details class:list={['group rounded-[20px] bg-surface', className]}>
+	<summary
+		class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 font-semibold [&::-webkit-details-marker]:hidden"
+	>
+		<span>{PATHS[level].label} topics</span>
+		<span class="flex items-center gap-2 text-sm font-normal text-ink-muted">
+			{position > 0 && `${position} of ${topics.length}`}
+			<HugeiconsIcon
+				icon={ArrowDown01Icon}
+				size={20}
+				strokeWidth={2}
+				aria-hidden="true"
+				className="text-ink transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+			/>
+		</span>
+	</summary>
+	<TopicList topics={topics} currentTopic={currentTopic} class="px-2 pb-3" />
+</details>

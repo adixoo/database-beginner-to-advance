@@ -6,6 +6,7 @@ import Markdown from '../../components/Markdown.astro';
 import OnThisPage from '../../components/OnThisPage.astro';
 import PageActions from '../../components/PageActions.astro';
 import TopicPager from '../../components/TopicPager.astro';
+import TopicsMenu from '../../components/TopicsMenu.astro';
 import { MDX_COMPONENTS } from '../../components/markdown';
 import { PATHS } from '../../config/site';
 import LevelLayout from '../../layouts/LevelLayout.astro';
@@ -60,6 +61,10 @@ const levelTopics = await getTopics(level);
 			<h1 class="text-[clamp(44px,6vw,88px)] leading-[0.95] font-bold tracking-[-0.03em]">
 				{topic.data.title}
 			</h1>
+			<p class="mt-5 max-w-[48ch] text-[clamp(18px,1.5vw,21px)] leading-snug text-ink">
+				{topic.data.description}
+			</p>
+			<TopicsMenu level={level} currentTopic={topic.id} class="mt-8 lg:hidden" />
 			<Markdown class="mt-10">
 				<Content components={MDX_COMPONENTS} />
 			</Markdown>
