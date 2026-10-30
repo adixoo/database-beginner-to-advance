@@ -1,13 +1,14 @@
 ---
 import type { GetStaticPaths } from 'astro';
-import { LEVELS, PATHS, type Level } from '../../config/site';
+import PracticeTools from '../../components/PracticeTools.astro';
+import { LEVELS, PATHS, type LearningPath, type Level } from '../../config/site';
 import LevelLayout from '../../layouts/LevelLayout.astro';
 
 export const getStaticPaths = (() =>
 	LEVELS.map((level) => ({ params: { level } }))) satisfies GetStaticPaths;
 
 const level = Astro.params.level as Level;
-const path = PATHS[level];
+const path: LearningPath = PATHS[level];
 ---
 
 <LevelLayout level={level} title={path.label} description={path.summary}>
@@ -21,4 +22,27 @@ const path = PATHS[level];
 	>
 		{path.summary}
 	</p>
+	<div class="mt-12 flex max-w-xl flex-col gap-6" data-reveal style="--i: 2">
+		{
+			path.prerequisites && path.prerequisites.length > 0 && (
+				<section class="rounded-[20px] bg-surface p-6" aria-labelledby="prerequisites">
+					<h2 id="prerequisites" class="text-lg font-semibold">
+						Prerequisites
+					</h2>
+					<p class="mt-2 text-base text-ink-soft">You only need the basics of:</p>
+					<ul class="mt-4 flex flex-col gap-3">
+						{path.prerequisites.map((item) => (
+							<li class="flex gap-3 text-base text-ink">
+								<span aria-hidden="true" class="text-mint">
+									→
+								</span>
+								{item}
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
+		<PracticeTools />
+	</div>
 </LevelLayout>

@@ -1,0 +1,43 @@
+---
+// Links to the topics before and after the current one, shown where a topic ends.
+// The first topic has no "Previous" card and the last has no "Next" card.
+import { topicHref, type Topic } from '../lib/topics';
+
+interface Props {
+	// The level's topics, in sidebar order
+	topics: Topic[];
+	currentId: string;
+	class?: string;
+}
+
+const { topics, currentId, class: className } = Astro.props;
+const index = topics.findIndex((topic) => topic.id === currentId);
+const previous = index > 0 ? topics[index - 1] : undefined;
+const next = index >= 0 && index < topics.length - 1 ? topics[index + 1] : undefined;
+
+const CARD =
+	'flex flex-col gap-1 rounded-[20px] bg-surface px-6 py-5 transition-colors hover:bg-raised';
+---
+
+{
+	(previous || next) && (
+		<nav aria-label="More topics" class:list={['grid gap-3 sm:grid-cols-2', className]}>
+			{previous && (
+				<a href={topicHref(previous)} rel="prev" class={CARD}>
+					<span class="text-sm text-ink-muted">
+						<span aria-hidden="true">←</span> Previous
+					</span>
+					<span class="text-lg font-semibold text-ink">{previous.data.title}</span>
+				</a>
+			)}
+			{next && (
+				<a href={topicHref(next)} rel="next" class:list={[CARD, 'text-right sm:col-start-2']}>
+					<span class="text-sm text-ink-muted">
+						Next <span aria-hidden="true">→</span>
+					</span>
+					<span class="text-lg font-semibold text-ink">{next.data.title}</span>
+				</a>
+			)}
+		</nav>
+	)
+}

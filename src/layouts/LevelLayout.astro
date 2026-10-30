@@ -28,7 +28,7 @@ const { level, title, description, currentTopic } = Astro.props;
 			<TopicsSidebar
 				level={level}
 				currentTopic={currentTopic}
-				class="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1"
+				class="scrollbar-on-hover lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1 lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto lg:overscroll-contain"
 			/>
 		</div>
 	</div>

@@ -1,0 +1,41 @@
+---
+// Card linking to the in-browser tools readers can practise the examples in
+import { PRACTICE_TOOLS } from '../config/site';
+
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<section
+	class:list={['not-prose rounded-[20px] bg-surface p-6', className]}
+	aria-labelledby="practice-tools"
+>
+	<h2 id="practice-tools" class="text-lg font-semibold">Practice tools</h2>
+	<p class="mt-2 text-base text-ink-soft">Try every example yourself, free in your browser.</p>
+	<ul class="mt-4 flex flex-col gap-1">
+		{
+			PRACTICE_TOOLS.map((tool) => (
+				<li>
+					<a
+						href={tool.href}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="-mx-3 block rounded-xl px-3 py-2 transition-colors hover:bg-raised"
+					>
+						<span class="text-base font-semibold text-ink">
+							{tool.name}
+							<span aria-hidden="true" class="ml-1 text-sky">
+								↗
+							</span>
+							<span class="sr-only">(opens in a new tab)</span>
+						</span>
+						<span class="mt-0.5 block text-base text-ink-soft">{tool.description}</span>
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</section>

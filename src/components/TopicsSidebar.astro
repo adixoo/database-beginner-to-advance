@@ -13,8 +13,9 @@ const topics = await getTopics(level);
 const headingId = `${level}-topics`;
 ---
 
-<aside class:list={['rounded-[20px] bg-surface p-6', className]} aria-labelledby={headingId}>
-	<h2 id={headingId} class="text-lg font-semibold">{PATHS[level].label} topics</h2>
+<!-- data-lenis-prevent: when the list is taller than the window it scrolls itself, not the page -->
+<aside class={className} aria-labelledby={headingId} data-lenis-prevent>
+	<h2 id={headingId} class="px-3 text-lg font-semibold">{PATHS[level].label} topics</h2>
 	{
 		topics.length ? (
 			<ol class="mt-4 flex flex-col gap-1">
@@ -23,7 +24,7 @@ const headingId = `${level}-topics`;
 						<a
 							href={topicHref(topic)}
 							aria-current={topic.id === currentTopic ? 'page' : undefined}
-							class="-mx-3 block rounded-xl px-3 py-2 text-base text-ink-soft transition-colors hover:bg-raised hover:text-ink aria-[current=page]:bg-raised aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+							class="block rounded-xl px-3 py-2 text-base text-ink-soft transition-colors hover:bg-raised hover:text-ink aria-[current=page]:bg-raised aria-[current=page]:font-semibold aria-[current=page]:text-ink"
 						>
 							{topic.data.title}
 						</a>
@@ -31,7 +32,7 @@ const headingId = `${level}-topics`;
 				))}
 			</ol>
 		) : (
-			<p class="mt-4 text-base text-ink-soft">No topics yet.</p>
+			<p class="mt-4 px-3 text-base text-ink-soft">No topics yet.</p>
 		)
 	}
 </aside>

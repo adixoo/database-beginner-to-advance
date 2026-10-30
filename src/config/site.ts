@@ -7,6 +7,8 @@ export interface LearningPath {
 	label: string;
 	href: string;
 	summary: string;
+	// What a reader should already know before starting this path
+	prerequisites?: readonly string[];
 }
 
 export const PATHS = {
@@ -14,6 +16,7 @@ export const PATHS = {
 		label: 'Beginner',
 		href: '/beginner',
 		summary: 'Start here if databases are new to you.',
+		prerequisites: ['A programming language', 'A backend framework'],
 	},
 	advanced: {
 		label: 'Advanced',
@@ -21,3 +24,27 @@ export const PATHS = {
 		summary: 'For when you already write SQL and want to go deeper.',
 	},
 } as const satisfies Record<Level, LearningPath>;
+
+export interface PracticeTool {
+	name: string;
+	// Short name for the navbar
+	navLabel: string;
+	href: string;
+	description: string;
+}
+
+// Free in-browser tools readers can open to try the examples themselves
+export const PRACTICE_TOOLS = [
+	{
+		name: 'Sequill editor',
+		navLabel: 'SQLite editor',
+		href: 'https://sequill.adibitz.com/app',
+		description: 'Write and run SQL on a SQLite database in your browser.',
+	},
+	{
+		name: 'Sequill schema visualizer',
+		navLabel: 'Schema design',
+		href: 'https://sequill.adibitz.com/vis',
+		description: 'See your tables and how they connect as a diagram.',
+	},
+] as const satisfies readonly PracticeTool[];

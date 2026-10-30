@@ -1,5 +1,7 @@
 ---
-import { LEVELS, PATHS, SITE_NAME, type Level } from '../config/site';
+import { ArrowUpRight01Icon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { LEVELS, PATHS, PRACTICE_TOOLS, SITE_NAME, type Level } from '../config/site';
 
 interface Props {
 	current?: Level;
@@ -9,9 +11,9 @@ const { current } = Astro.props;
 ---
 
 <header class="px-page">
-	<nav aria-label="Main" class="flex items-center justify-between py-6 text-lg">
+	<nav aria-label="Main" class="flex items-center justify-between gap-6 py-6 text-lg">
 		<div data-reveal><a href="/" class="font-bold tracking-tight link">{SITE_NAME}</a></div>
-		<ul class="flex gap-8">
+		<ul class="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 sm:gap-x-8">
 			{
 				LEVELS.map((level, i) => (
 					<li data-reveal style={`--i: ${i + 1}`}>
@@ -21,6 +23,35 @@ const { current } = Astro.props;
 							class="text-ink-soft link aria-[current=page]:text-ink aria-[current=page]:decoration-current"
 						>
 							{PATHS[level].label}
+						</a>
+					</li>
+				))
+			}
+			<!-- External practice tools, set apart from the levels by a thin rule -->
+			<li
+				aria-hidden="true"
+				class="hidden h-5 w-px bg-gray-700 sm:block"
+				data-reveal
+				style={`--i: ${LEVELS.length + 1}`}
+			>
+			</li>
+			{
+				PRACTICE_TOOLS.map((tool, i) => (
+					<li data-reveal style={`--i: ${LEVELS.length + i + 1}`}>
+						<a
+							href={tool.href}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex items-center gap-1 text-ink-soft link"
+						>
+							{tool.navLabel}
+							<HugeiconsIcon
+								icon={ArrowUpRight01Icon}
+								size={16}
+								strokeWidth={2}
+								aria-hidden="true"
+							/>
+							<span class="sr-only">(opens in a new tab)</span>
 						</a>
 					</li>
 				))

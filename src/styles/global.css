@@ -149,6 +149,22 @@
 	}
 }
 
+/* A thin scrollbar for a panel that scrolls on its own. With a mouse it shows only while the
+   panel is hovered or holds focus; touch screens keep it, since they cannot hover. */
+@utility scrollbar-on-hover {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-gray-600) transparent;
+
+	@media (hover: hover) {
+		scrollbar-color: transparent transparent;
+
+		&:hover,
+		&:focus-within {
+			scrollbar-color: var(--color-gray-600) transparent;
+		}
+	}
+}
+
 /* Tailwind Typography tuned to the Pastel Noir tokens and type scale. Use with `prose`. */
 @utility prose-pastel {
 	/* Doubled class so these beat the plugin defaults whatever the rule order */
