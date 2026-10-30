@@ -114,6 +114,7 @@ Values are px on a 1920×1080 frame (they also fit the 1080-wide vertical canvas
 | `raised` | `{gray-850}` | Alias: table header, chips, lower-third bar. |
 | `hairline` | `{gray-700}` | Alias: every 2px rule and border. |
 | `ink` | `{gray-100}` | Alias: primary text. |
+| `ink-body` | `#d0d0d6` | Website only: running text (paragraphs, lists), a step softer than `ink` so long reading doesn't glare. 12.9:1 on gray-950. Headings stay `ink`. |
 | `ink-soft` | `{gray-300}` | Alias: secondary text. |
 | `ink-muted` | `{gray-400}` | Alias: captions, units, comments. |
 | `on-accent` | `{gray-950}` | Text on a solid pastel fill (chips, step badges). 10.7:1 or better on every accent. |

@@ -61,7 +61,7 @@ const levelTopics = await getTopics(level);
 			<h1 class="text-[clamp(44px,6vw,88px)] leading-[0.95] font-bold tracking-[-0.03em]">
 				{topic.data.title}
 			</h1>
-			<p class="mt-5 max-w-[48ch] text-[clamp(18px,1.5vw,21px)] leading-snug text-ink">
+			<p class="mt-5 max-w-[48ch] text-[clamp(18px,1.5vw,21px)] leading-snug text-ink-body">
 				{topic.data.description}
 			</p>
 			<TopicsMenu level={level} currentTopic={topic.id} class="mt-8 lg:hidden" />

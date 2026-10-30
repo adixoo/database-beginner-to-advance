@@ -22,6 +22,8 @@
 	--color-gray-600: #45454c;
 	--color-gray-500: #6b6b73;
 	--color-ink: #ededf0;
+	/* Running text: a step down from ink so long reading doesn't glare (12.9:1 on canvas) */
+	--color-ink-body: #d0d0d6;
 	--color-ink-soft: #bdbdc4;
 	--color-ink-muted: #93939b;
 	--color-mint: #a6e3c4;
@@ -41,7 +43,7 @@
 @layer base {
 	html {
 		background: var(--color-canvas);
-		color: var(--color-ink);
+		color: var(--color-ink-body);
 		font-family: var(--font-sans);
 		-webkit-font-smoothing: antialiased;
 		color-scheme: dark;
@@ -95,6 +97,11 @@
 
 	body {
 		@apply bg-background text-foreground;
+	}
+
+	/* Headings keep full ink; running text is a step softer (ink-body) */
+	:where(h1, h2, h3, h4, h5, h6) {
+		color: var(--color-ink);
 	}
 }
 
@@ -178,7 +185,7 @@
 @utility prose-pastel {
 	/* Doubled class so these beat the plugin defaults whatever the rule order */
 	&.prose {
-		--tw-prose-body: var(--color-ink);
+		--tw-prose-body: var(--color-ink-body);
 		--tw-prose-headings: var(--color-ink);
 		--tw-prose-lead: var(--color-ink-soft);
 		--tw-prose-links: var(--color-mint);
@@ -319,7 +326,7 @@
 
 :root {
 	--background: var(--color-canvas);
-	--foreground: var(--color-ink);
+	--foreground: var(--color-ink-body);
 	--card: var(--color-surface);
 	--card-foreground: var(--color-ink);
 	--popover: var(--color-raised);
