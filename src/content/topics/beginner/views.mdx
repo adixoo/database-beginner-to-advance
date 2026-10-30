@@ -1,0 +1,76 @@
+---
+title: Views
+description: A view saves a query under a name, so you can read its result like a table that is always up to date.
+level: beginner
+order: 18
+---
+
+import Callout from '@/components/Callout.astro';
+import ViewLive from '@/components/graphics/ViewLive.astro';
+import ViewQuery from '@/components/graphics/ViewQuery.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Some queries you run again and again, like the [join](/beginner/joins) that shows each post with its author. A **view** saves that query under a name, so you can read it like a table.
+
+## Create a view
+
+```sql
+CREATE VIEW post_authors AS
+SELECT posts.caption, users.username
+FROM posts
+JOIN users ON posts.user_id = users.id;
+```
+
+<ViewQuery />
+
+Now read it like any table:
+
+```sql
+SELECT * FROM post_authors WHERE username = 'asha.codes';
+```
+
+| caption             | username   |
+| ------------------- | ---------- |
+| Sunset at the beach | asha.codes |
+| Weekend trek        | asha.codes |
+
+## Always up to date
+
+A view keeps no rows of its own, so it can never go stale:
+
+```sql
+INSERT INTO posts (user_id, caption) VALUES (3, 'Homemade pasta');
+
+SELECT * FROM post_authors;
+```
+
+<ViewLive />
+
+<Callout type="warning">
+
+You can read from a view, but not add rows to it. `INSERT INTO post_authors` fails with `cannot modify post_authors because it is a view`. Change the real tables instead.
+
+</Callout>
+
+## Delete a view
+
+```sql
+DROP VIEW post_authors;
+```
+
+This deletes only the saved query. `posts` and `users` keep every row.
+
+## Words to know
+
+<WordsToKnow>
+
+- **CREATE VIEW**
+  The SQL command that saves a query under a name.
+- **DROP VIEW**
+  The SQL command that deletes a view, but not the data it reads.
+- **View**
+  A saved query you can read like a table.
+- **Virtual table**
+  Another name for a view: it looks like a table but stores no rows.
+
+</WordsToKnow>

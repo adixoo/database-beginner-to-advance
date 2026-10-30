@@ -1,0 +1,69 @@
+---
+// GROUP BY user_id: each user's posts share a wash (sky, lilac) and collapse into one
+// result row with the same wash. The user_id values say which group a row is in, so the colour
+// is only a second cue.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH } from './query-posts-data';
+import QueryFlow from './QueryFlow.astro';
+import QueryNote from './QueryNote.astro';
+
+const COLUMNS = POSTS_COLUMNS.map((column) =>
+	column.label === 'user_id' ? { ...column, key: true } : column,
+);
+// Wash per user_id, in input row order (users 1, 2, 1, 2, 2) and result order (1, 2)
+const WASH = { 1: 'var(--color-sky)', 2: 'var(--color-lilac)' };
+const INPUT_GROUPS = [1, 2, 1, 2, 2] as const;
+const RESULT_GROUPS = [1, 2] as const;
+// Row tops, from QueryFlow's layout: input rows at 90 + 44i, result rows at 458 + 44i
+const washRect = (top: number, width: number, user: 1 | 2) => ({
+	x: 14,
+	y: top,
+	width: width - 8,
+	fill: WASH[user],
+});
+const WASHES = [
+	...INPUT_GROUPS.map((user, i) => washRect(90 + 44 * i, POSTS_WIDTH, user)),
+	...RESULT_GROUPS.map((user, i) => washRect(458 + 44 * i, 290, user)),
+];
+---
+
+<QueryFlow
+	id="gbu"
+	label="GROUP BY diagram"
+	title="GROUP BY user_id makes one row per user"
+	desc="User 1 has posts 101 (42 views) and 103 (15): 2 posts, 57 views. User 2 has posts 102 (7), 104 (23) and 105 (3): 3 posts, 33 views. User 3 has no posts, so there is no group for user 3. The result has one row per user_id."
+	input={{
+		width: POSTS_WIDTH,
+		columns: COLUMNS,
+		rows: POSTS_ROWS,
+	}}
+	step="GROUP BY user_id"
+	result={{
+		width: 290,
+		columns: [
+			{ label: 'user_id', x: 80, anchor: 'end', key: true },
+			{ label: 'posts', x: 150, anchor: 'end' },
+			{ label: 'total_views', x: 270, anchor: 'end' },
+		],
+		rows: [
+			['1', '2', '57'],
+			['2', '3', '33'],
+		],
+	}}
+>
+	<g aria-hidden="true">
+		{
+			WASHES.map((wash) => (
+				<rect
+					x={wash.x}
+					y={wash.y}
+					width={wash.width}
+					height="40"
+					rx="8"
+					fill={wash.fill}
+					fill-opacity="0.14"
+				/>
+			))
+		}
+	</g>
+	<QueryNote x={314} y={476} lines={['user 1: 42 + 15', '= 57 views']} />
+</QueryFlow>

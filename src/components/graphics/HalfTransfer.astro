@@ -1,0 +1,115 @@
+---
+// The problem transactions solve: moving 200 from Asha to Ravi takes two updates. The app
+// crashes after the first, so Asha loses 200 (peach) but Ravi never gains it, and the total
+// drops from 600 to 400 (rose). Handwritten note follows DESIGN.md. Below ~560px it scrolls
+// sideways.
+import SvgTable from './SvgTable.astro';
+
+const COLUMNS = (x: number) => [
+	{ label: 'id', x: x + 36, anchor: 'end' as const },
+	{ label: 'name', x: x + 60, anchor: 'start' as const },
+	{ label: 'balance', x: x + 170, anchor: 'end' as const },
+];
+---
+
+<figure class="not-prose my-10">
+	<div
+		class="overflow-x-auto"
+		role="region"
+		aria-label="Half-finished transfer diagram"
+		tabindex="0"
+	>
+		<svg
+			viewBox="0 0 700 240"
+			class="w-full min-w-[560px]"
+			role="img"
+			aria-labelledby="ht-title ht-desc"
+		>
+			<title id="ht-title">A crash between two updates makes money vanish</title>
+			<desc id="ht-desc">
+				Before: Asha has 500 and Ravi has 100, a total of 600. The first update takes 200 from Asha,
+				then the app crashes before Ravi's update runs. After: Asha has 300 and Ravi still has 100,
+				a total of 400. 200 has vanished.
+			</desc>
+
+			<SvgTable
+				name="before"
+				x={10}
+				y={40}
+				width={200}
+				columns={COLUMNS(10)}
+				rows={[
+					['1', 'Asha', '500'],
+					['2', 'Ravi', '100'],
+				]}
+			/>
+
+			<!-- Step 1 runs, then the crash -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M222 110 C 254 104, 296 104, 326 110"></path>
+				<path d="M326 110 l-8.1 -7.5 M326 110 l-9.8 5"></path>
+			</g>
+			<g aria-hidden="true" text-anchor="middle">
+				<text
+					x="274"
+					y="90"
+					font-family="var(--font-mono)"
+					font-size="13"
+					fill="var(--color-ink-soft)">Asha −200</text
+				>
+				<g font-family="var(--font-sans)" font-size="14" font-weight="600" fill="var(--color-rose)">
+					<text x="274" y="140">crash before</text>
+					<text x="274" y="158">Ravi +200</text>
+				</g>
+			</g>
+
+			<SvgTable
+				name="after a crash"
+				x={340}
+				y={40}
+				width={200}
+				columns={COLUMNS(340)}
+				rows={[
+					['1', 'Asha', '300'],
+					['2', 'Ravi', '100'],
+				]}
+				linkedRows={[0]}
+			/>
+
+			<!-- Totals -->
+			<g font-family="var(--font-sans)" font-size="15" text-anchor="middle">
+				<text x="110" y="222" fill="var(--color-ink-muted)">total 600</text>
+				<text x="440" y="222" fill="var(--color-rose)" font-weight="700">total 400</text>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M556 214 C 530 208, 500 210, 482 216"></path>
+				<path d="M482 216 l10.5 3.1 M482 216 l6.5 -8.9"></path>
+			</g>
+			<text
+				x="562"
+				y="222"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">200 vanished</text
+			>
+		</svg>
+	</div>
+</figure>

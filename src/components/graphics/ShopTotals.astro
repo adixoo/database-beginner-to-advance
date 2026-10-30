@@ -1,0 +1,126 @@
+---
+// The grouping query as a bar chart: one bar per customer, its length the total spent in cents,
+// with the quantity × price sums under each bar. A handwritten note shows that GROUP BY adds up
+// Asha's two orders (DESIGN.md: target, arrow, note). One SVG; it scrolls sideways when the
+// column is narrower than ~460px.
+
+interface Total {
+	name: string;
+	cents: number;
+	sum: string;
+}
+
+const TOTALS: Total[] = [
+	{ name: 'Asha', cents: 1920, sum: '2 × 450 + 1 × 120 + 3 × 300' },
+	{ name: 'Ravi', cents: 300, sum: '1 × 300' },
+];
+
+const BAR_X = 120;
+const BAR_MAX = 400;
+const BAR_HEIGHT = 32;
+const FIRST_BAR_Y = 62;
+const ROW_GAP = 88;
+const largest = Math.max(...TOTALS.map((total) => total.cents));
+const barWidth = (cents: number): number => (cents / largest) * BAR_MAX;
+---
+
+<figure class="not-prose my-10">
+	<div
+		class="overflow-x-auto"
+		role="region"
+		aria-label="Total spent per customer chart"
+		tabindex="0"
+	>
+		<svg
+			viewBox="0 0 640 260"
+			class="w-full min-w-[460px]"
+			role="img"
+			aria-labelledby="st-title st-desc"
+		>
+			<title id="st-title">Total spent per customer, in cents</title>
+			<desc id="st-desc">
+				Asha spent 1920 cents: 2 × 450 plus 1 × 120 plus 3 × 300, across two orders. Ravi spent 300
+				cents: 1 × 300. Meera has no orders, so Meera has no row.
+			</desc>
+
+			<text
+				x={BAR_X}
+				y="36"
+				font-family="var(--font-mono)"
+				font-size="13"
+				fill="var(--color-ink-muted)">total_cents</text
+			>
+			{
+				TOTALS.map((total, index) => {
+					const y = FIRST_BAR_Y + index * ROW_GAP;
+					const width = barWidth(total.cents);
+					return (
+						<g>
+							<text
+								x={BAR_X - 16}
+								y={y + 22}
+								text-anchor="end"
+								font-family="var(--font-sans)"
+								font-size="16"
+								font-weight="600"
+								fill="var(--color-ink)"
+							>
+								{total.name}
+							</text>
+							<rect
+								x={BAR_X}
+								y={y}
+								width={width}
+								height={BAR_HEIGHT}
+								rx="6"
+								fill="var(--color-mint)"
+							/>
+							<text
+								x={BAR_X + width + 12}
+								y={y + 22}
+								font-family="var(--font-mono)"
+								font-size="15"
+								fill="var(--color-ink)"
+								style="font-variant-numeric: tabular-nums"
+							>
+								{total.cents}
+							</text>
+							<text
+								x={BAR_X}
+								y={y + 56}
+								font-family="var(--font-mono)"
+								font-size="13"
+								fill="var(--color-ink-muted)"
+							>
+								{total.sum}
+							</text>
+						</g>
+					);
+				})
+			}
+
+			<!-- Annotation: arrow ends 16px short of Asha's bar -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M468 150 C 470 138, 466 124, 468 110"></path>
+				<path d="M468 110 l-6.3 9 M468 110 l6.3 9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="440" y="174">Asha's 2 orders,</text>
+				<text x="440" y="198">added up</text>
+			</g>
+		</svg>
+	</div>
+</figure>

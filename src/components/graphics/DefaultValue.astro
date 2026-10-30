@@ -1,0 +1,40 @@
+---
+// DEFAULT filling in a value: the new post leaves out views, and the table stores 0.
+import {
+	CONSTRAINT_POSTS_COLUMNS,
+	CONSTRAINT_POSTS_ROWS,
+	CONSTRAINT_POSTS_WIDTH,
+} from './constraint-tables';
+import QueryNote from './QueryNote.astro';
+import SvgTable from './SvgTable.astro';
+
+const ROWS = [...CONSTRAINT_POSTS_ROWS, ['106', '2', 'Rainy day', '0']];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="DEFAULT diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 470"
+			class="w-full min-w-[512px]"
+			role="img"
+			aria-labelledby="dvl-title dvl-desc"
+		>
+			<title id="dvl-title">DEFAULT fills in views when the INSERT leaves it out</title>
+			<desc id="dvl-desc">
+				The INSERT gives only user_id 2 and the caption Rainy day. The new row 106 is stored with
+				views 0, the column's default, below posts 101 to 105.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={40}
+				width={CONSTRAINT_POSTS_WIDTH}
+				columns={CONSTRAINT_POSTS_COLUMNS}
+				rows={ROWS}
+				linkedRows={[ROWS.length - 1]}
+			/>
+			<QueryNote x={412} y={382} lines={['filled in', 'for you']} direction="up" />
+		</svg>
+	</div>
+</figure>

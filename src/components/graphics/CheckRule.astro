@@ -1,0 +1,25 @@
+---
+// CHECK (views >= 0) turning away an UPDATE that sets a post's views to -5.
+import {
+	CONSTRAINT_POSTS_COLUMNS,
+	CONSTRAINT_POSTS_ROWS,
+	CONSTRAINT_POSTS_WIDTH,
+} from './constraint-tables';
+import ConstraintCheck from './ConstraintCheck.astro';
+---
+
+<ConstraintCheck
+	id="cr"
+	label="CHECK diagram"
+	title="CHECK refuses negative views"
+	desc="The posts table holds posts 101 to 105. An UPDATE tries to set the views of post 101, Sunset at the beach, to -5. The rule CHECK (views >= 0) fails, so the change is refused with: CHECK constraint failed: views >= 0."
+	name="posts"
+	tableWidth={CONSTRAINT_POSTS_WIDTH}
+	columns={CONSTRAINT_POSTS_COLUMNS}
+	rows={CONSTRAINT_POSTS_ROWS}
+	statement="UPDATE"
+	attempt={['101', '1', 'Sunset at the beach', '-5']}
+	badColumn={3}
+	error="CHECK constraint failed: views >= 0"
+	note={["views can't", 'be negative']}
+/>

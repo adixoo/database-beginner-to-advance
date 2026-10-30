@@ -1,0 +1,22 @@
+---
+// WHERE views > 10: the three posts that pass stay (peach), the two that fail are dimmed, and
+// the result keeps every column but only those rows.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH, postsRows } from './query-posts-data';
+import QueryNote from './QueryNote.astro';
+import QueryFlow from './QueryFlow.astro';
+
+const KEPT = [0, 2, 3];
+---
+
+<QueryFlow
+	id="wf"
+	label="WHERE diagram"
+	title="WHERE views > 10 keeps three of the five posts"
+	desc="Posts 101 (42 views), 103 (15) and 104 (23) pass the test and are kept. Posts 102 (7) and 105 (3) fail and are left out. The result has the same four columns and three rows."
+	input={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: POSTS_ROWS }}
+	keep={KEPT}
+	step="WHERE views > 10"
+	result={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: postsRows(KEPT) }}
+>
+	<QueryNote x={424} y={520} lines={['same columns,', 'fewer rows']} />
+</QueryFlow>

@@ -1,0 +1,112 @@
+---
+// The three steps between a backend app and its database: connect, send the SQL with its
+// values kept apart, and get rows back. Structural arrows in ink-muted, the value in mint.
+// One SVG; it scrolls sideways when the column is narrower than ~600px.
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="App and database diagram" tabindex="0">
+		<svg
+			viewBox="0 0 760 300"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="adf-title adf-desc"
+		>
+			<title id="adf-title">How an app talks to its database in three steps</title>
+			<desc id="adf-desc">
+				Step 1: the app connects to the database. Step 2: it sends the query SELECT * FROM users
+				WHERE username = ?, with the value asha.codes sent separately. Step 3: the database sends
+				back the matching row: id 1, username asha.codes and name Asha.
+			</desc>
+
+			<!-- The app -->
+			<rect x="20" y="40" width="180" height="240" rx="20" fill="var(--color-surface)"></rect>
+			<text
+				x="110"
+				y="150"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="20"
+				font-weight="700"
+				fill="var(--color-ink)">Your app</text
+			>
+			<text
+				x="110"
+				y="176"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="15"
+				fill="var(--color-ink-muted)">Node.js backend</text
+			>
+
+			<!-- The database: a cylinder -->
+			<rect x="560" y="40" width="180" height="240" rx="20" fill="var(--color-surface)"></rect>
+			<g
+				fill="none"
+				stroke="var(--color-ink-soft)"
+				stroke-width="3"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<ellipse cx="650" cy="92" rx="34" ry="10"></ellipse>
+				<path d="M616 92 L616 128 A34 10 0 0 0 684 128 L684 92"></path>
+				<path d="M616 110 A34 10 0 0 0 684 110"></path>
+			</g>
+			<text
+				x="650"
+				y="176"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="20"
+				font-weight="700"
+				fill="var(--color-ink)">Database</text
+			>
+			<text
+				x="650"
+				y="202"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="15"
+				fill="var(--color-ink-muted)">instagram.db</text
+			>
+
+			<!-- The three steps -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M212 100 C 330 92, 430 92, 546 100"></path>
+				<path d="M546 100 l-8.6 -6.9 M546 100 l-9.4 5.7"></path>
+				<path d="M212 160 C 330 152, 430 152, 546 160"></path>
+				<path d="M546 160 l-8.6 -6.9 M546 160 l-9.4 5.7"></path>
+				<path d="M546 240 C 430 248, 330 248, 212 240"></path>
+				<path d="M212 240 l8.6 6.9 M212 240 l9.4 -5.7"></path>
+			</g>
+			<g
+				font-family="var(--font-sans)"
+				font-size="15"
+				fill="var(--color-ink-soft)"
+				text-anchor="middle"
+			>
+				<text x="379" y="84">1 Connect</text>
+				<text x="379" y="144">2 Send the query, with its value apart</text>
+				<text x="379" y="232">3 Get the rows back</text>
+			</g>
+			<g font-family="var(--font-mono)" font-size="13" text-anchor="middle">
+				<text x="379" y="182" fill="var(--color-ink)"
+					><tspan fill="var(--color-lilac)">SELECT</tspan> * <tspan fill="var(--color-lilac)"
+						>FROM</tspan
+					> users <tspan fill="var(--color-lilac)">WHERE</tspan> username = <tspan
+						fill="var(--color-mint)">?</tspan
+					></text
+				>
+				<text x="379" y="202" fill="var(--color-mint)">value: 'asha.codes'</text>
+				<text x="379" y="268" fill="var(--color-ink)">row: 1 | asha.codes | Asha</text>
+			</g>
+		</svg>
+	</div>
+</figure>

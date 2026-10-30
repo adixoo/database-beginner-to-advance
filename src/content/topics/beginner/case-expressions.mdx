@@ -1,0 +1,75 @@
+---
+title: CASE expressions
+description: CASE is an if/else inside SQL. It checks each row and returns a value, so you can label rows on the fly.
+level: beginner
+order: 13
+---
+
+import Callout from '@/components/Callout.astro';
+import CaseFirstMatch from '@/components/graphics/CaseFirstMatch.astro';
+import CaseLabel from '@/components/graphics/CaseLabel.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+`CASE` is an if/else inside a query. For each row it checks your conditions in order and returns a value. We use the course posts and the `views` column from [Filtering and sorting](/beginner/filtering-and-sorting).
+
+## One WHEN and an ELSE
+
+Label each post `popular` or `quiet`:
+
+```sql
+SELECT caption, views,
+  CASE
+    WHEN views >= 40 THEN 'popular'
+    ELSE 'quiet'
+  END AS label
+FROM posts;
+```
+
+<CaseLabel />
+
+`AS label` names the new column.
+
+## Several WHENs
+
+Add a middle step:
+
+```sql
+SELECT caption, views,
+  CASE
+    WHEN views >= 40 THEN 'popular'
+    WHEN views >= 10 THEN 'growing'
+    ELSE 'quiet'
+  END AS label
+FROM posts;
+```
+
+<CaseFirstMatch />
+
+<Callout type="warning">
+
+Put the strictest `WHEN` first. Swap the two `WHEN`s and Sunset at the beach becomes `growing`, because `42 >= 10` is checked first and is true.
+
+</Callout>
+
+<Callout type="info">
+
+Without `ELSE`, a row that matches no `WHEN` gets `NULL`: here First latte art and post 105.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **CASE**
+  An if/else that returns a value for each row.
+- **ELSE**
+  The value used when no WHEN is true.
+- **END**
+  Closes a CASE expression.
+- **THEN**
+  The value returned when its WHEN is true.
+- **WHEN**
+  A condition to check, in order, top to bottom.
+
+</WordsToKnow>

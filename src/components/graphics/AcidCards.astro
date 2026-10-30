@@ -1,0 +1,64 @@
+---
+// ACID as four cards: a big mint letter, the word, and a two-line meaning. Below ~520px it
+// scrolls sideways.
+
+const CARDS = [
+	{ letter: 'A', word: 'Atomicity', lines: ['All steps happen,', 'or none do.'] },
+	{ letter: 'C', word: 'Consistency', lines: ['The rules you set', 'always hold.'] },
+	{ letter: 'I', word: 'Isolation', lines: ['Others never see', 'half-done work.'] },
+	{ letter: 'D', word: 'Durability', lines: ['Once committed,', 'it stays saved.'] },
+];
+const CARD_WIDTH = 148;
+const CARD_GAP = 10;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="ACID diagram" tabindex="0">
+		<svg
+			viewBox="0 0 632 140"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="acid-title acid-desc"
+		>
+			<title id="acid-title">ACID: four guarantees of a transaction</title>
+			<desc id="acid-desc">
+				Atomicity: all steps happen, or none do. Consistency: the rules you set always hold.
+				Isolation: others never see half-done work. Durability: once committed, it stays saved.
+			</desc>
+
+			{
+				CARDS.map((card, index) => {
+					const x = 6 + index * (CARD_WIDTH + CARD_GAP);
+					return (
+						<g aria-hidden="true" font-family="var(--font-sans)">
+							<rect
+								x={x}
+								y="6"
+								width={CARD_WIDTH}
+								height="128"
+								rx="16"
+								fill="var(--color-surface)"
+							/>
+							<text x={x + 18} y="50" font-size="38" font-weight="700" fill="var(--color-mint)">
+								{card.letter}
+							</text>
+							<text x={x + 18} y="78" font-size="16" font-weight="700" fill="var(--color-ink)">
+								{card.word}
+							</text>
+							{card.lines.map((line, lineIndex) => (
+								<text
+									x={x + 18}
+									y={102 + lineIndex * 19}
+									font-size="14"
+									fill="var(--color-ink-soft)"
+								>
+									{line}
+								</text>
+							))}
+						</g>
+					);
+				})
+			}
+		</svg>
+	</div>
+</figure>

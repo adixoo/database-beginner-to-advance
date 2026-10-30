@@ -1,0 +1,24 @@
+---
+// UNIQUE turning away a second asha.codes.
+import {
+	CONSTRAINT_USERS_COLUMNS,
+	CONSTRAINT_USERS_ROWS,
+	CONSTRAINT_USERS_WIDTH,
+} from './constraint-tables';
+import ConstraintCheck from './ConstraintCheck.astro';
+---
+
+<ConstraintCheck
+	id="uc"
+	label="UNIQUE diagram"
+	title="UNIQUE refuses a username that is already taken"
+	desc="The users table holds asha.codes, ravi.clicks and meera.eats. An INSERT tries to add asha.codes again. username is UNIQUE, so the row is refused with: UNIQUE constraint failed: users.username."
+	name="users"
+	tableWidth={CONSTRAINT_USERS_WIDTH}
+	columns={CONSTRAINT_USERS_COLUMNS}
+	rows={CONSTRAINT_USERS_ROWS}
+	attempt={['–', 'asha.codes', 'Asha']}
+	badColumn={1}
+	error="UNIQUE constraint failed: users.username"
+	note={['already', 'taken']}
+/>

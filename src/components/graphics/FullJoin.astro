@@ -1,0 +1,121 @@
+---
+// How FULL JOIN builds its result: every row of both tables is kept. Matches are joined (mint
+// arrows); post 104, whose user no longer exists, and meera.eats, who has no posts, both stay in
+// (peach), with NULL filling the side that has no match. Handwritten notes follow DESIGN.md
+// (target, arrow, note). One SVG so the arrows stay locked to the rows at any width; below
+// ~540px it scrolls sideways.
+import JoinResult from './JoinResult.astro';
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="FULL JOIN diagram" tabindex="0">
+		<svg
+			viewBox="0 0 690 700"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="fj-title fj-desc"
+		>
+			<title id="fj-title">FULL JOIN keeps every row from both tables</title>
+			<desc id="fj-desc">
+				Posts 101, 102 and 103 match their users. Post 104 has user_id 4, but there is no user 4, so
+				it has no match. meera.eats has no posts, so it has no match either. Both are still kept.
+				The result has five rows: the three matches; post 104 with NULL for the users columns; and
+				meera.eats (Meera) with NULL for the posts columns. Every row has id, user_id and caption
+				from posts, then id, username and name from users.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'id', x: 54, anchor: 'end' },
+					{ label: 'user_id', x: 124, anchor: 'end', key: true },
+					{ label: 'caption', x: 150, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '4', 'Old post'],
+				]}
+				keyTint={{ x: 64, width: 66 }}
+				linkedRows={[3]}
+			/>
+			<SvgTable
+				name="users"
+				x={440}
+				y={40}
+				width={230}
+				columns={[
+					{ label: 'id', x: 474, anchor: 'end', key: true },
+					{ label: 'username', x: 494, anchor: 'start' },
+					{ label: 'name', x: 600, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes', 'Asha'],
+					['2', 'ravi.clicks', 'Ravi'],
+					['3', 'meera.eats', 'Meera'],
+				]}
+				keyTint={{ x: 446, width: 40 }}
+				linkedRows={[2]}
+			/>
+
+			<!-- The matches: each post's user_id to the user with that id -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M344 108 C 372 102, 404 102, 432 106"></path>
+				<path d="M432 106 l-8.1 -7.5 M432 106 l-9.8 5"></path>
+				<path d="M344 152 C 372 146, 404 146, 432 150"></path>
+				<path d="M432 150 l-8.1 -7.5 M432 150 l-9.8 5"></path>
+				<path d="M344 196 C 384 194, 400 128, 432 116"></path>
+				<path d="M432 116 l-10.7 -2.7 M432 116 l-6.2 9.1"></path>
+			</g>
+
+			<JoinResult
+				y={288}
+				rows={[
+					['101', '1', 'Sunset at the beach', '1', 'asha.codes', 'Asha'],
+					['102', '2', 'First latte art', '2', 'ravi.clicks', 'Ravi'],
+					['103', '1', 'Weekend trek', '1', 'asha.codes', 'Asha'],
+					['104', '4', 'Old post', 'NULL', 'NULL', 'NULL'],
+					['NULL', 'NULL', 'NULL', '3', 'meera.eats', 'Meera'],
+				]}
+				linkedRows={[3, 4]}
+			/>
+
+			<!-- Annotation: one note, an arrow to each row with no match -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M568 574 C 562 568, 558 564, 552 564"></path>
+				<path d="M552 564 l9 6.3 M552 564 l9 -6.3"></path>
+				<path d="M568 614 C 562 610, 558 608, 552 608"></path>
+				<path d="M552 608 l9 6.3 M552 608 l9 -6.3"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="574" y="590">no match,</text>
+				<text x="574" y="614">so NULL</text>
+			</g>
+		</svg>
+	</div>
+</figure>

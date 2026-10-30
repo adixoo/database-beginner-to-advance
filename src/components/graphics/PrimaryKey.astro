@@ -1,0 +1,159 @@
+---
+// The `users` table with its primary key column (mint) and the one row that `id = 1` finds
+// (peach), each pointed at by a handwritten note (DESIGN.md annotation: target, arrow, note).
+// One SVG so the arrows stay locked to the table at any width; below ~500px it scrolls sideways.
+
+const COLUMNS = [
+	{ label: 'id', x: 104, anchor: 'end' },
+	{ label: 'username', x: 136, anchor: 'start' },
+	{ label: 'name', x: 330, anchor: 'start' },
+] as const;
+
+const ROWS = [
+	['1', 'asha.codes', 'Asha'],
+	['2', 'ravi.clicks', 'Ravi'],
+	['3', 'meera.eats', 'Meera'],
+] as const;
+
+const FRAME = { x: 60, y: 60, width: 420, height: 196 };
+const HEADER_BASELINE = 92;
+const ROW_TOP = 108;
+const ROW_HEIGHT = 44;
+// The row the graphic points at (id = 1)
+const ROW_INDEX = 0;
+
+const rowBaseline = (index: number): number => ROW_TOP + index * ROW_HEIGHT + 28;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Primary key diagram" tabindex="0">
+		<svg
+			viewBox="0 0 660 270"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="pk-title pk-desc"
+		>
+			<title id="pk-title">The id column is the primary key of the users table</title>
+			<desc id="pk-desc">
+				The id column is highlighted: its values 1, 2 and 3 are unique and never empty. The row with
+				id 1, asha.codes, is highlighted: asking for id 1 always finds exactly that one row.
+			</desc>
+
+			<!-- Table frame -->
+			<rect
+				x={FRAME.x}
+				y={FRAME.y}
+				width={FRAME.width}
+				height={FRAME.height}
+				rx="14"
+				fill="var(--color-surface)"></rect>
+
+			<!-- Highlights: primary key column (mint), the row id = 1 finds (peach) -->
+			<rect
+				x={FRAME.x + 6}
+				y={FRAME.y + 6}
+				width="50"
+				height={FRAME.height - 12}
+				rx="8"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"></rect>
+			<rect
+				x={FRAME.x + 4}
+				y={ROW_TOP + ROW_INDEX * ROW_HEIGHT + 2}
+				width={FRAME.width - 8}
+				height={ROW_HEIGHT - 4}
+				rx="8"
+				fill="var(--color-peach)"
+				fill-opacity="0.1"
+				stroke="var(--color-peach)"
+				stroke-width="2"></rect>
+
+			<!-- Table rules -->
+			<line
+				x1={FRAME.x + 16}
+				y1={ROW_TOP}
+				x2={FRAME.x + FRAME.width - 16}
+				y2={ROW_TOP}
+				stroke="var(--color-gray-700)"></line>
+			{
+				ROWS.slice(1).map((_, index) => {
+					const y = ROW_TOP + (index + 1) * ROW_HEIGHT;
+					return (
+						<line
+							x1={FRAME.x + 16}
+							y1={y}
+							x2={FRAME.x + FRAME.width - 16}
+							y2={y}
+							stroke="var(--color-gray-800)"
+						/>
+					);
+				})
+			}
+
+			<!-- Header and cells -->
+			<g font-family="var(--font-sans)" font-size="16">
+				{
+					COLUMNS.map((column, columnIndex) => (
+						<text
+							x={column.x}
+							y={HEADER_BASELINE}
+							text-anchor={column.anchor}
+							fill={columnIndex === 0 ? 'var(--color-mint)' : 'var(--color-ink-muted)'}
+							font-size="15"
+							font-weight={columnIndex === 0 ? 600 : 400}
+						>
+							{column.label}
+						</text>
+					))
+				}
+				{
+					ROWS.map((row, rowIndex) =>
+						row.map((value, columnIndex) => (
+							<text
+								x={COLUMNS[columnIndex].x}
+								y={rowBaseline(rowIndex)}
+								text-anchor={COLUMNS[columnIndex].anchor}
+								fill={
+									columnIndex === 0
+										? 'var(--color-mint)'
+										: rowIndex === ROW_INDEX
+											? 'var(--color-ink)'
+											: 'var(--color-ink-soft)'
+								}
+								font-weight={columnIndex === 0 || rowIndex === ROW_INDEX ? 600 : 400}
+							>
+								{value}
+							</text>
+						)),
+					)
+				}
+			</g>
+
+			<!-- Annotations: arrows end 14-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M136 34 C 116 30, 102 38, 98 52"></path>
+				<path d="M98 52 l8.5 -7 M98 52 l-3.6 -10.4"></path>
+				<path d="M530 176 C 530 150, 518 138, 496 134"></path>
+				<path d="M496 134 l7.7 7.8 M496 134 l10 -4.6"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="26"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="142" y="40">unique and never empty</text>
+				<text x="490" y="204">ask for id = 1,</text>
+				<text x="490" y="232">get one row</text>
+			</g>
+		</svg>
+	</div>
+</figure>

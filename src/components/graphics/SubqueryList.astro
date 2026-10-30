@@ -1,0 +1,167 @@
+---
+// A subquery that returns a list: the inner query reads every post's user_id (1, 2, 1, 2, 2), then
+// the outer query keeps only the users whose id is NOT IN that list. Users 1 and 2 are struck
+// out (rose); meera.eats is kept (peach). Handwritten notes follow DESIGN.md (target, arrow,
+// note). Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Subquery with a list diagram" tabindex="0">
+		<svg
+			viewBox="0 0 740 450"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="sql-title sql-desc"
+		>
+			<title id="sql-title">
+				The inner query lists 1, 2, 1, 2, 2, and NOT IN keeps everyone else
+			</title>
+			<desc id="sql-desc">
+				The inner query reads user_id from every post and returns 1, 2, 1, 2 and 2. The outer query
+				keeps users whose id is not in that list. asha.codes (1) and ravi.clicks (2) are in the
+				list, so they are left out. meera.eats (3) is not, so it is kept. The result is meera.eats.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'id', x: 54, anchor: 'end' },
+					{ label: 'user_id', x: 124, anchor: 'end', key: true },
+					{ label: 'caption', x: 150, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '2', 'Street tacos'],
+					['105', '2', 'NULL'],
+				]}
+				keyTint={{ x: 64, width: 66 }}
+			/>
+
+			<!-- The inner query's answer: a list -->
+			<text
+				x="442"
+				y="74"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="13"
+				fill="var(--color-ink-muted)">inner query</text
+			>
+			<rect
+				x="372"
+				y="88"
+				width="140"
+				height="40"
+				rx="10"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"
+				stroke="var(--color-mint)"
+				stroke-width="2"></rect>
+			<text
+				x="442"
+				y="114"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="18"
+				font-weight="600"
+				fill="var(--color-mint)">1, 2, 1, 2, 2</text
+			>
+			<text
+				x="442"
+				y="152"
+				text-anchor="middle"
+				font-family="var(--font-mono)"
+				font-size="14"
+				fill="var(--color-ink-muted)">NOT IN</text
+			>
+
+			<SvgTable
+				name="users"
+				x={550}
+				y={40}
+				width={180}
+				columns={[
+					{ label: 'id', x: 586, anchor: 'end', key: true },
+					{ label: 'username', x: 610, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+					['3', 'meera.eats'],
+				]}
+				keyTint={{ x: 556, width: 40 }}
+				linkedRows={[2]}
+			/>
+			<!-- In the list, so left out -->
+			<g stroke="var(--color-rose)" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+				<line x1="566" y1="110" x2="706" y2="110"></line>
+				<line x1="566" y1="154" x2="706" y2="154"></line>
+			</g>
+
+			<!-- posts → list → users -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M344 150 C 354 140, 356 116, 366 110"></path>
+				<path d="M366 110 l-11 -0.9 M366 110 l-4.6 10"></path>
+				<path d="M516 108 C 526 104, 534 104, 544 108"></path>
+				<path d="M544 108 l-8.1 -7.5 M544 108 l-9.8 5"></path>
+			</g>
+
+			<!-- users → result -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M640 244 C 642 256, 638 272, 640 286"></path>
+				<path d="M640 286 l-6.3 -9 M640 286 l6.3 -9"></path>
+			</g>
+
+			<SvgTable
+				name="result"
+				x={550}
+				y={330}
+				width={180}
+				columns={[{ label: 'username', x: 570, anchor: 'start' }]}
+				rows={[['meera.eats']]}
+			/>
+
+			<!-- Annotation: arrow ends 12-16px short of the struck rows -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M490 200 C 504 192, 526 172, 538 162"></path>
+				<path d="M538 162 l-11 0.9 M538 162 l-2.9 10.6"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="442" y="222" text-anchor="middle">in the list,</text>
+				<text x="442" y="246" text-anchor="middle">so left out</text>
+			</g>
+		</svg>
+	</div>
+</figure>

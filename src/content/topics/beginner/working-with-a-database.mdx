@@ -1,0 +1,108 @@
+---
+title: Working with a database
+description: Add, read, change and delete rows with the four SQL commands you will use every day, INSERT, SELECT, UPDATE and DELETE.
+level: beginner
+order: 5
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Almost everything an app does with its data is one of four jobs: add it, read it, change it or delete it. Developers call this **CRUD** (create, read, update, delete), and SQL has one command for each.
+
+We will use the `users` and `posts` tables from [Create your first database](/beginner/create-your-first-database). Run each example in [Sequill](https://sequill.adibitz.com/app), in order.
+
+## Add data with INSERT
+
+`INSERT` adds new rows. Name the table and columns, then give the values in the same order:
+
+```sql
+INSERT INTO users (username, name)
+VALUES ('asha.codes', 'Asha'), ('ravi.clicks', 'Ravi'), ('meera.eats', 'Meera');
+
+INSERT INTO posts (id, user_id, caption)
+VALUES (101, 1, 'Sunset at the beach'), (102, 2, 'Latte art'), (103, 1, 'Weekend trek'), (104, 3, 'Test post');
+```
+
+For users you skip `id`, and SQLite fills it in: Asha gets `1`, Ravi `2` and Meera `3`. You can also give the `id` yourself, as the posts do: starting them at `101` keeps them from looking like user ids. Text goes in single quotes; numbers do not.
+
+The rules you set on the table now protect it. Try adding a second `asha.codes`, and the database refuses with `UNIQUE constraint failed: users.username`.
+
+## Read data with SELECT
+
+`SELECT` reads rows. `*` means every column:
+
+```sql
+SELECT * FROM users;
+```
+
+|  id | username    | name  |
+| --: | ----------- | ----- |
+|   1 | asha.codes  | Asha  |
+|   2 | ravi.clicks | Ravi  |
+|   3 | meera.eats  | Meera |
+
+Name the columns you want, and add `WHERE` to keep only the rows that match:
+
+```sql
+SELECT caption FROM posts WHERE user_id = 1;
+```
+
+| caption             |
+| ------------------- |
+| Sunset at the beach |
+| Weekend trek        |
+
+`ORDER BY` sorts the result, `DESC` flips it to newest first, and `LIMIT` keeps only the first few rows:
+
+```sql
+SELECT id, caption FROM posts ORDER BY id DESC LIMIT 2;
+```
+
+|  id | caption      |
+| --: | ------------ |
+| 104 | Test post    |
+| 103 | Weekend trek |
+
+## Change data with UPDATE
+
+`UPDATE` changes rows that already exist. `SET` says the new value, and `WHERE` says which rows. Ravi wants a better caption for post 102:
+
+```sql
+UPDATE posts SET caption = 'First latte art' WHERE id = 102;
+```
+
+## Delete data with DELETE
+
+`DELETE` removes rows. `WHERE` again says which ones. Meera's test post can go:
+
+```sql
+DELETE FROM posts WHERE id = 104;
+```
+
+Your `posts` table now holds the three posts the rest of the course uses: 101, 102 and 103.
+
+<Callout type="danger">
+
+**Always write the `WHERE` first.** Without it, `UPDATE` changes every row and `DELETE` empties the whole table, with no undo. A safe habit: run a `SELECT` with the same `WHERE`, check it returns only the rows you mean, then swap `SELECT` for `UPDATE` or `DELETE`.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **CRUD**
+  Create, read, update, delete: the four jobs apps do with data.
+- **DELETE**
+  The SQL command that removes rows.
+- **INSERT**
+  The SQL command that adds new rows.
+- **SELECT**
+  The SQL command that reads rows.
+- **UPDATE**
+  The SQL command that changes rows that already exist.
+- **WHERE**
+  The part of a command that picks which rows it works on.
+
+</WordsToKnow>

@@ -1,0 +1,118 @@
+---
+title: Filtering and sorting
+description: Keep only the rows you want with WHERE, then put them in order with ORDER BY and LIMIT.
+level: beginner
+order: 9
+---
+
+import Callout from '@/components/Callout.astro';
+import AndOrGrid from '@/components/graphics/AndOrGrid.astro';
+import DistinctValues from '@/components/graphics/DistinctValues.astro';
+import InBetweenLike from '@/components/graphics/InBetweenLike.astro';
+import IsNullFilter from '@/components/graphics/IsNullFilter.astro';
+import OrderLimit from '@/components/graphics/OrderLimit.astro';
+import WhereFilter from '@/components/graphics/WhereFilter.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+`WHERE` keeps the rows that pass a test. `ORDER BY` sorts them, and `LIMIT` keeps the first few.
+
+Posts need a view count for these examples. `ALTER TABLE` adds a `views` column to your `posts` table, then fill it in and add two more posts by Ravi:
+
+```sql
+ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0);
+
+UPDATE posts SET views = 42 WHERE id = 101;
+UPDATE posts SET views = 7 WHERE id = 102;
+UPDATE posts SET views = 15 WHERE id = 103;
+
+INSERT INTO posts (id, user_id, caption, views)
+VALUES (104, 2, 'Street tacos', 23), (105, 2, NULL, 3);
+```
+
+## WHERE
+
+```sql
+SELECT * FROM posts WHERE views > 10;
+```
+
+<WhereFilter />
+
+Other tests work the same way: `=`, `!=`, `<`, `<=` and `>=`.
+
+## AND and OR
+
+```sql
+SELECT * FROM posts WHERE user_id = 1 AND views > 20;
+SELECT * FROM posts WHERE user_id = 1 OR views > 20;
+```
+
+`AND` needs both tests to pass. `OR` needs just one:
+
+<AndOrGrid />
+
+## IN, BETWEEN and LIKE
+
+```sql
+SELECT * FROM posts WHERE user_id IN (2, 3);
+SELECT * FROM posts WHERE views BETWEEN 10 AND 30;
+SELECT * FROM posts WHERE caption LIKE 'S%';
+```
+
+<InBetweenLike />
+
+- `IN` matches any value in the list. Meera (user 3) has no posts, so only Ravi's show up.
+- `BETWEEN` includes both ends.
+- `LIKE` matches a pattern. `%` means "anything", so `'S%'` means "starts with S".
+
+## IS NULL
+
+```sql
+SELECT * FROM posts WHERE caption IS NULL;
+```
+
+<IsNullFilter />
+
+<Callout type="warning">
+
+`WHERE caption = NULL` finds nothing, because [NULL is never equal to anything](/beginner/data-types#null-no-value). Always write `IS NULL`.
+
+</Callout>
+
+## ORDER BY and LIMIT
+
+```sql
+SELECT * FROM posts ORDER BY views DESC LIMIT 3;
+```
+
+<OrderLimit />
+
+`DESC` puts the biggest first. Leave it out, or write `ASC`, for smallest first.
+
+## DISTINCT
+
+```sql
+SELECT DISTINCT user_id FROM posts;
+```
+
+<DistinctValues />
+
+## Words to know
+
+<WordsToKnow>
+
+- **ALTER TABLE**
+  Changes a table that already exists, such as adding a column.
+- **BETWEEN**
+  A test for a range, including both ends.
+- **DISTINCT**
+  Removes repeated rows from the result.
+- **LIKE**
+  A test for text that matches a pattern, where % means anything.
+- **LIMIT**
+  Keeps only the first few rows of the result.
+- **ORDER BY**
+  Sorts the result, smallest first unless you add DESC.
+- **WHERE**
+  Keeps only the rows that pass a test.
+
+</WordsToKnow>

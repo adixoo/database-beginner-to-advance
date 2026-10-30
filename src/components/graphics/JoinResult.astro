@@ -1,0 +1,83 @@
+---
+// The bottom half of a posts-and-users join graphic, drawn inside a parent <svg>: an arrow down
+// labelled with the ON condition, the `SELECT *` result (posts' columns, then users'), and
+// brackets under it saying which columns came from which table. `y` is where the arrow starts.
+import SvgTable from './SvgTable.astro';
+
+interface Props {
+	y: number;
+	rows: string[][];
+	// Result rows outlined because a note points at them
+	linkedRows?: number[];
+}
+
+// Offsets from `y`
+const ARROW_END = 42;
+const LABEL_BASELINE = 26;
+const TABLE_TOP = 76;
+// Must match SvgTable's layout
+const TABLE_HEIGHT = (rowCount: number): number => 48 + rowCount * 44 + 16;
+
+const { y, rows, linkedRows } = Astro.props;
+const tableBottom = y + TABLE_TOP + TABLE_HEIGHT(rows.length);
+---
+
+<g aria-hidden="true">
+	<g
+		fill="none"
+		stroke="var(--color-ink-muted)"
+		stroke-width="3"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d={`M190 ${y} C 192 ${y + 12}, 188 ${y + 28}, 190 ${y + ARROW_END}`}></path>
+		<path d={`M190 ${y + ARROW_END} l-6.3 -9 M190 ${y + ARROW_END} l6.3 -9`}></path>
+	</g>
+	<text
+		x="206"
+		y={y + LABEL_BASELINE}
+		font-family="var(--font-mono)"
+		font-size="14"
+		fill="var(--color-ink-muted)">ON posts.user_id = users.id</text
+	>
+</g>
+
+<SvgTable
+	name="result"
+	x={10}
+	y={y + TABLE_TOP}
+	width={530}
+	columns={[
+		{ label: 'id', x: 62, anchor: 'end' },
+		{ label: 'user_id', x: 132, anchor: 'end', key: true },
+		{ label: 'caption', x: 152, anchor: 'start' },
+		{ label: 'id', x: 334, anchor: 'end', key: true },
+		{ label: 'username', x: 354, anchor: 'start' },
+		{ label: 'name', x: 464, anchor: 'start' },
+	]}
+	rows={rows}
+	linkedRows={linkedRows}
+/>
+
+<!-- Which columns came from which table -->
+<g aria-hidden="true">
+	<g
+		fill="none"
+		stroke="var(--color-gray-600)"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d={`M20 ${tableBottom + 10} l0 6 l280 0 l0 -6`}></path>
+		<path d={`M312 ${tableBottom + 10} l0 6 l218 0 l0 -6`}></path>
+	</g>
+	<g
+		font-family="var(--font-sans)"
+		font-size="14"
+		fill="var(--color-ink-muted)"
+		text-anchor="middle"
+	>
+		<text x="160" y={tableBottom + 36}>from posts</text>
+		<text x="421" y={tableBottom + 36}>from users</text>
+	</g>
+</g>

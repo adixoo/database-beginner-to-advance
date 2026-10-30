@@ -36,6 +36,26 @@ export function topicToMarkdown(topic: Topic): string {
 	return `# ${topic.data.title}\n\n${body}\n`;
 }
 
+export interface CodeSnippet {
+	lang: string;
+	code: string;
+}
+
+// A fenced code block: ```sql … ```, with optional words after the language (```sql illustration)
+const CODE_FENCE = /^```(\w*)([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm;
+// Fences that show output rather than code to run
+const OUTPUT_LANGS = new Set(['', 'text', 'plaintext', 'txt']);
+// Marks an example that is only for reading, not for the course database: ```sql illustration
+const ILLUSTRATION = /\billustration\b/;
+
+// The topic's runnable code examples, in order, without output-only or illustration blocks
+export function topicCodeSnippets(topic: Topic): CodeSnippet[] {
+	const body = (topic.body ?? '').replace(/\r\n/g, '\n');
+	return [...body.matchAll(CODE_FENCE)]
+		.filter(([, lang = '', meta = '']) => !OUTPUT_LANGS.has(lang) && !ILLUSTRATION.test(meta))
+		.map(([, lang = '', , code = '']) => ({ lang, code: code.trimEnd() }));
+}
+
 // A level's topics as a Markdown list with site-relative links and one-line descriptions
 export function topicsToMarkdown(level: Level, topics: Topic[]): string {
 	const path = PATHS[level];

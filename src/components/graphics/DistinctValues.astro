@@ -1,0 +1,33 @@
+---
+// SELECT DISTINCT user_id: each user_id once; the repeats (posts 103, 104 and 105) are dropped.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH } from './query-posts-data';
+import QueryNote from './QueryNote.astro';
+import QueryFlow from './QueryFlow.astro';
+
+const COLUMNS = POSTS_COLUMNS.map((column) =>
+	column.label === 'user_id' ? { ...column, key: true } : column,
+);
+---
+
+<QueryFlow
+	id="dv"
+	label="DISTINCT diagram"
+	title="SELECT DISTINCT user_id lists each user_id once"
+	desc="The user_id column holds 1, 2, 1, 2 and 2. DISTINCT drops the repeats, from posts 103, 104 and 105, and returns 1 and 2."
+	input={{
+		width: POSTS_WIDTH,
+		columns: COLUMNS,
+		rows: POSTS_ROWS,
+		keyTint: { x: 68, width: 62 },
+	}}
+	keep={[0, 1]}
+	step="SELECT DISTINCT user_id"
+	result={{
+		width: 120,
+		columns: [{ label: 'user_id', x: 90, anchor: 'end', key: true }],
+		rows: [['1'], ['2']],
+		keyTint: { x: 34, width: 62 },
+	}}
+>
+	<QueryNote x={424} y={196} lines={['1 again,', 'dropped']} />
+</QueryFlow>

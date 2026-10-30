@@ -1,0 +1,82 @@
+---
+title: Transactions
+description: A transaction groups several changes so they all happen together, or not at all.
+level: beginner
+order: 17
+---
+
+import AcidCards from '@/components/graphics/AcidCards.astro';
+import Callout from '@/components/Callout.astro';
+import HalfTransfer from '@/components/graphics/HalfTransfer.astro';
+import Rollback from '@/components/graphics/Rollback.astro';
+import TransactionFlow from '@/components/graphics/TransactionFlow.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A **transaction** groups changes so they happen together, or not at all. The classic example is moving money between two accounts:
+
+```sql
+CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT NOT NULL, balance INTEGER NOT NULL);
+INSERT INTO accounts VALUES (1, 'Asha', 500), (2, 'Ravi', 100);
+```
+
+## The problem
+
+Moving 200 from Asha to Ravi takes two updates. If the app crashes between them:
+
+<HalfTransfer />
+
+## BEGIN and COMMIT
+
+Wrap both updates in a transaction:
+
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 200 WHERE id = 1;
+UPDATE accounts SET balance = balance + 200 WHERE id = 2;
+COMMIT;
+```
+
+<TransactionFlow />
+
+Nothing is saved until `COMMIT`. If the app crashes before it, the database throws the half-done work away.
+
+## ROLLBACK
+
+Changed your mind? `ROLLBACK` undoes everything since `BEGIN`:
+
+```sql
+BEGIN;
+DELETE FROM accounts;
+ROLLBACK;
+```
+
+<Rollback />
+
+<Callout type="info">
+
+Without `BEGIN`, every statement is its own transaction and is saved straight away.
+
+</Callout>
+
+## ACID
+
+Transactions come with four guarantees, called **ACID**:
+
+<AcidCards />
+
+## Words to know
+
+<WordsToKnow>
+
+- **ACID**
+  Atomicity, consistency, isolation and durability: what a transaction guarantees.
+- **BEGIN**
+  Starts a transaction.
+- **COMMIT**
+  Saves every change made since BEGIN.
+- **ROLLBACK**
+  Undoes every change made since BEGIN.
+- **Transaction**
+  A group of changes that happen together, or not at all.
+
+</WordsToKnow>

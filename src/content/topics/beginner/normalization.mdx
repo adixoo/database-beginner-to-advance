@@ -1,0 +1,80 @@
+---
+title: Normalization
+description: Normalization splits repeated data into linked tables, so every fact is stored once and can never disagree with itself.
+level: beginner
+order: 15
+---
+
+import Callout from '@/components/Callout.astro';
+import FirstNormalForm from '@/components/graphics/FirstNormalForm.astro';
+import SecondNormalForm from '@/components/graphics/SecondNormalForm.astro';
+import ThirdNormalForm from '@/components/graphics/ThirdNormalForm.astro';
+import UpdateAnomaly from '@/components/graphics/UpdateAnomaly.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+**Normalization** means storing every fact once. When the same data is copied into many rows, the copies drift apart.
+
+## The problem with repeated data
+
+This table copies each author's username into every post. Asha changes username, but the update only reaches one post:
+
+```sql
+CREATE TABLE posts_flat (post_id INTEGER PRIMARY KEY, caption TEXT, user_id INTEGER, username TEXT);
+INSERT INTO posts_flat VALUES
+  (101, 'Sunset at the beach', 1, 'asha.codes'),
+  (102, 'First latte art', 2, 'ravi.clicks'),
+  (103, 'Weekend trek', 1, 'asha.codes');
+
+UPDATE posts_flat SET username = 'asha.art' WHERE post_id = 101;
+```
+
+<UpdateAnomaly />
+
+The three **normal forms** are rules that stop this from happening.
+
+## 1NF: one value per cell
+
+<FirstNormalForm />
+
+A list inside a cell can't be searched or joined properly. Give each value its own row:
+
+```sql
+CREATE TABLE post_tags (
+  post_id INTEGER NOT NULL REFERENCES posts (id),
+  tag TEXT NOT NULL,
+  PRIMARY KEY (post_id, tag)
+);
+```
+
+## 2NF: depend on the whole key
+
+<SecondNormalForm />
+
+A like is identified by `user_id` and `post_id` together. `username` depends on `user_id` alone, half of the key, so it moves to `users`.
+
+## 3NF: depend only on the key
+
+<ThirdNormalForm />
+
+`username` is decided by `user_id`, not by the post. Keep only `user_id` in `posts` and store each name once in `users`: the design from [Table relationships](/beginner/table-relationships).
+
+<Callout type="info">
+
+Each form builds on the one before: a table in 3NF is also in 2NF and 1NF.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Normal form**
+  A rule a table design follows, such as 1NF, 2NF or 3NF.
+- **Normalization**
+  Splitting tables so every fact is stored only once.
+- **Redundant data**
+  The same fact copied into more than one place.
+- **Update anomaly**
+  A bug where changing one copy leaves the other copies out of date.
+
+</WordsToKnow>

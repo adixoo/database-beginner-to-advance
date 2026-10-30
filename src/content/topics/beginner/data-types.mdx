@@ -1,0 +1,114 @@
+---
+title: Data types
+description: A data type tells the database what kind of value a column holds, such as a number, text or a date.
+level: beginner
+order: 4
+---
+
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+## What is a data type
+
+Every column has a **data type**: the kind of value it holds. A `price` column holds numbers, a `username` column holds text, and a `created_at` column holds dates.
+
+The type matters because the database uses it to:
+
+- **Refuse wrong values**, so nobody can save `'hello'` as a price.
+- **Sort and compare correctly.** As numbers, `9` comes before `10`. As text, `'10'` comes before `'9'`, because `'1'` comes before `'9'`.
+- **Save space**, since a small number takes less room than a long sentence.
+
+## The types you will use most
+
+| Kind           | Use it for                    | Example                 |
+| -------------- | ----------------------------- | ----------------------- |
+| Whole number   | IDs, counts, ages             | `42`                    |
+| Decimal number | Ratings, measurements         | `4.5`                   |
+| Exact decimal  | Money                         | `199.99`                |
+| Text           | Names, emails, captions       | `'asha.codes'`          |
+| True or false  | Yes/no answers, such as admin | `true`                  |
+| Date           | Birthdays, due dates          | `'2026-10-30'`          |
+| Date and time  | When something happened       | `'2026-10-30 14:05:00'` |
+
+For money, always use an exact decimal. A plain decimal number is stored as a close approximation, so tiny rounding errors creep in when you add up many prices.
+
+## Data types per database
+
+Each DBMS spells these types a little differently. Here is the same list in four popular ones:
+
+| Kind           | SQLite             | PostgreSQL           | MySQL           | SQL Server      |
+| -------------- | ------------------ | -------------------- | --------------- | --------------- |
+| Whole number   | `INTEGER`          | `INTEGER`, `BIGINT`  | `INT`, `BIGINT` | `INT`, `BIGINT` |
+| Decimal number | `REAL`             | `DOUBLE PRECISION`   | `DOUBLE`        | `FLOAT`         |
+| Exact decimal  | `INTEGER` (cents)  | `NUMERIC(10,2)`      | `DECIMAL(10,2)` | `DECIMAL(10,2)` |
+| Text           | `TEXT`             | `TEXT`, `VARCHAR(n)` | `VARCHAR(n)`    | `NVARCHAR(n)`   |
+| True or false  | `INTEGER` (0 or 1) | `BOOLEAN`            | `BOOLEAN`       | `BIT`           |
+| Date           | `TEXT`             | `DATE`               | `DATE`          | `DATE`          |
+| Date and time  | `TEXT`             | `TIMESTAMP`          | `DATETIME`      | `DATETIME2`     |
+
+- `VARCHAR(n)` is text with a maximum length: `VARCHAR(30)` holds up to 30 characters.
+- `DECIMAL(10,2)` holds up to 10 digits, 2 of them after the point, such as `12345678.99`.
+- `BIGINT` is a whole number for very large values, such as IDs in a huge app.
+
+## NULL: no value
+
+`NULL` means "no value here": a post with no caption, or a birthday nobody entered. It works the same in every database, and any column can hold it, whatever its type, unless you add `NOT NULL`.
+
+`NULL` is not zero and not empty text:
+
+| Value  | Means                   |
+| ------ | ----------------------- |
+| `0`    | The number zero         |
+| `''`   | Text with nothing in it |
+| `NULL` | No value, or not known  |
+
+Because `NULL` means "not known", it is never equal to anything, not even another `NULL`. So `WHERE caption = NULL` finds nothing. Use `IS NULL` or `IS NOT NULL` instead:
+
+```sql
+SELECT * FROM posts WHERE caption IS NULL;
+```
+
+Your `posts` table is still empty, so this returns no rows for now. You will add posts in the next topic.
+
+Add `NOT NULL` to columns that must always have a value, such as `username`, and leave it off optional ones, such as `caption`.
+
+## SQLite keeps it simple
+
+SQLite, the database we use in this course, has just five storage types: `NULL`, `INTEGER`, `REAL`, `TEXT` and `BLOB` (raw bytes, such as a file). It has no separate date or true/false type, so you store dates as text like `'2026-10-30'` and true/false as `1` or `0`.
+
+SQLite is also relaxed: by default it lets you put text in an `INTEGER` column. Add `STRICT` after a table to make it refuse wrong types:
+
+```sql
+CREATE TABLE items (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  price_cents INTEGER NOT NULL
+) STRICT;
+```
+
+Try it in [Sequill](https://sequill.adibitz.com/app). SQLite refuses this, because `'hello'` is not a whole number:
+
+```sql
+INSERT INTO items (name, price_cents) VALUES ('Mug', 'hello');
+-- Error: cannot store TEXT value in INTEGER column items.price_cents
+```
+
+## Words to know
+
+<WordsToKnow>
+
+- **BOOLEAN**
+  A type that holds only true or false.
+- **Data type**
+  The kind of value a column holds, such as a number, text or a date.
+- **DECIMAL**
+  An exact number with a fixed count of digits after the point, used for money.
+- **INTEGER**
+  A whole number, with no decimal point.
+- **NULL**
+  No value at all, which is different from 0 or empty text.
+- **TEXT**
+  Letters, words and sentences.
+- **VARCHAR**
+  Text with a maximum length.
+
+</WordsToKnow>

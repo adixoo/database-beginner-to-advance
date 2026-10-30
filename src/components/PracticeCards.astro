@@ -1,0 +1,139 @@
+---
+// Best practices as numbered cards: a title, a "Do" line (mint ✓), a "Don't" line (rose ✗) and a
+// link to the topic that teaches it. Wrap a Markdown list; each item is a bold title with a
+// nested list of exactly those three lines, in that order:
+//
+//   <PracticeCards>
+//
+//   - **Give every table a primary key**
+//     - Do: `id INTEGER PRIMARY KEY`
+//     - Don't: rows you can't tell apart
+//     - [Keys](/beginner/keys)
+//
+//   </PracticeCards>
+//
+// The link line is optional. The words "Do" and "Don't" stay in the text, so the meaning never
+// rests on colour, and the list stays plain Markdown for "Copy page". Numbering carries on across
+// every PracticeCards on a page.
+
+interface Props {
+	class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={['practices not-prose my-8', className]}>
+	<slot />
+</div>
+
+<style>
+	/* One counter for the whole topic, so numbering continues from one group to the next */
+	:global(.prose:has(.practices)) {
+		counter-reset: practice;
+	}
+
+	.practices :global(> ul) {
+		display: grid;
+		gap: 12px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	@media (min-width: 640px) {
+		.practices :global(> ul) {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	/* One card per practice, numbered 01, 02, … across the page */
+	.practices :global(> ul > li) {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 22px 24px 24px;
+		border-radius: 20px;
+		background: var(--color-surface);
+		color: var(--color-ink);
+		font-size: 16px;
+		line-height: 1.45;
+		counter-increment: practice;
+	}
+
+	.practices :global(> ul > li)::before {
+		content: counter(practice, decimal-leading-zero);
+		color: var(--color-ink-muted);
+		font-family: var(--font-mono);
+		font-size: 13px;
+	}
+
+	.practices :global(> ul > li > strong),
+	.practices :global(> ul > li > p > strong) {
+		display: block;
+		font-size: 20px;
+		font-weight: 700;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+	}
+
+	.practices :global(> ul > li p) {
+		margin: 0;
+	}
+
+	.practices :global(> ul > li > ul) {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.practices :global(> ul > li > ul > li) {
+		position: relative;
+		padding-left: 26px;
+		color: var(--color-ink-soft);
+	}
+
+	/* Do, Don't, then the topic link */
+	.practices :global(> ul > li > ul > li:nth-child(-n + 2))::before {
+		position: absolute;
+		top: 0;
+		left: 0;
+		font-weight: 700;
+	}
+
+	.practices :global(> ul > li > ul > li:nth-child(1))::before {
+		content: '✓';
+		color: var(--color-mint);
+	}
+
+	.practices :global(> ul > li > ul > li:nth-child(2))::before {
+		content: '✗';
+		color: var(--color-rose);
+	}
+
+	.practices :global(> ul > li > ul > li:nth-child(3)) {
+		margin-top: 4px;
+		padding-left: 0;
+		font-size: 14px;
+	}
+
+	.practices :global(> ul > li > ul > li:nth-child(3) a) {
+		color: var(--color-mint);
+		text-decoration: underline;
+		text-decoration-thickness: 0.07em;
+		text-underline-offset: 0.2em;
+	}
+
+	.practices :global(code) {
+		padding: 1px 6px;
+		border-radius: 6px;
+		background: var(--color-raised);
+		color: var(--color-ink);
+		font-family: var(--font-mono);
+		font-size: 0.875em;
+		font-variant-ligatures: none;
+	}
+</style>

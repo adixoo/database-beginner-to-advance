@@ -1,0 +1,32 @@
+---
+// Two tests ticked row by row, then combined: AND ticks a row only when both tests do, OR when
+// either does.
+import MatchGrid from './MatchGrid.astro';
+---
+
+<MatchGrid
+	id="aog"
+	label="AND and OR diagram"
+	title="AND needs both tests to pass, OR needs one"
+	desc="Post 101 (user 1, 42 views) passes both tests, so it matches AND and OR. Post 103 (user 1, 15 views) passes only user_id = 1, and post 104 (user 2, 23 views) passes only views > 20, so each matches OR but not AND. Posts 102 and 105 pass neither."
+	columns={[
+		{ label: 'id', x: 50, anchor: 'end' },
+		{ label: 'user_id', x: 124, anchor: 'end' },
+		{ label: 'views', x: 190, anchor: 'end' },
+	]}
+	rows={[
+		['101', '1', '42'],
+		['102', '2', '7'],
+		['103', '1', '15'],
+		['104', '2', '23'],
+		['105', '2', '3'],
+	]}
+	checks={[
+		{ header: ['user_id', '= 1'], x: 270, values: [true, false, true, false, false] },
+		{ header: ['views', '> 20'], x: 360, values: [true, false, false, true, false] },
+		{ header: ['both', 'AND'], x: 470, values: [true, false, false, false, false] },
+		{ header: ['either', 'OR'], x: 550, values: [true, false, true, true, false] },
+	]}
+	tableWidth={600}
+	dividerX={415}
+/>

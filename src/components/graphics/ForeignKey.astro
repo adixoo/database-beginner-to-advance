@@ -1,0 +1,98 @@
+---
+// `posts` and `users` side by side. The foreign key column (posts.user_id) and the primary key
+// it points to (users.id) share mint, and one post's row is linked to its author's row (peach).
+// Handwritten notes name the two keys (DESIGN.md annotation: target, arrow, note).
+// One SVG so the arrows stay locked to the rows at any width; below ~500px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Foreign key diagram" tabindex="0">
+		<svg
+			viewBox="0 0 700 306"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="fk-title fk-desc"
+		>
+			<title id="fk-title">posts.user_id is a foreign key that points to users.id</title>
+			<desc id="fk-desc">
+				The posts table has id, user_id and caption. The users table has id and username. The post
+				Sunset at the beach has user_id 1, which links to the user with id 1, asha.codes. user_id is
+				the foreign key; users.id is the primary key it points to.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={20}
+				y={60}
+				width={360}
+				columns={[
+					{ label: 'id', x: 60, anchor: 'end' },
+					{ label: 'user_id', x: 130, anchor: 'end', key: true },
+					{ label: 'caption', x: 156, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+				]}
+				keyTint={{ x: 74, width: 66 }}
+				linkedRows={[0]}
+			/>
+			<SvgTable
+				name="users"
+				x={460}
+				y={60}
+				width={220}
+				columns={[
+					{ label: 'id', x: 500, anchor: 'end', key: true },
+					{ label: 'username', x: 530, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+				]}
+				keyTint={{ x: 466, width: 50 }}
+				linkedRows={[0]}
+			/>
+
+			<!-- The link: from the post's row to its author's row -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M384 128 C 408 122, 428 122, 448 126"></path>
+				<path d="M448 126 l-7.6 -8 M448 126 l-10.1 4.4"></path>
+			</g>
+
+			<!-- Annotations: arrows end 14-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M144 284 C 124 288, 110 280, 108 266"></path>
+				<path d="M108 266 l-5 9.8 M108 266 l7.5 8.1"></path>
+				<path d="M534 242 C 514 246, 494 238, 491 222"></path>
+				<path d="M491 222 l-5 9.8 M491 222 l7.5 8.1"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="26"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="150" y="292">foreign key</text>
+				<text x="540" y="250">primary key</text>
+			</g>
+		</svg>
+	</div>
+</figure>

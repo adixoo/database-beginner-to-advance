@@ -1,0 +1,186 @@
+---
+// The `users` table with its two candidate keys: id (mint, picked as the primary key) and
+// username (sky, kept UNIQUE). An imagined fourth user, asha.art, is also named Asha, so the name
+// column repeats and cannot be a key (rose).
+// Handwritten notes follow DESIGN.md (target, arrow, note); labels under the columns name the
+// keys, so the meaning never rests on colour alone. Below ~500px it scrolls sideways.
+
+const COLUMNS = [
+	{ label: 'id', x: 104, anchor: 'end', tone: 'var(--color-mint)' },
+	{ label: 'username', x: 176, anchor: 'start', tone: 'var(--color-sky)' },
+	{ label: 'name', x: 360, anchor: 'start' },
+] as const;
+
+const ROWS = [
+	['1', 'asha.codes', 'Asha'],
+	['2', 'ravi.clicks', 'Ravi'],
+	['3', 'meera.eats', 'Meera'],
+	['4', 'asha.art', 'Asha'],
+] as const;
+
+const FRAME = { x: 60, y: 80, width: 420, height: 240 };
+const HEADER_BASELINE = 112;
+const ROW_TOP = 128;
+const ROW_HEIGHT = 44;
+const NAME_COLUMN = 2;
+// Rows whose name repeats
+const REPEATED_ROWS = [0, 3];
+
+const rowTop = (index: number): number => ROW_TOP + index * ROW_HEIGHT;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Candidate key diagram" tabindex="0">
+		<svg
+			viewBox="0 0 660 356"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="ck-title ck-desc"
+		>
+			<title id="ck-title">id and username are candidate keys of the users table</title>
+			<desc id="ck-desc">
+				Both id and username are unique in every row, so either could be the primary key. id was
+				picked as the primary key, and username is kept unique. The rows are asha.codes,
+				ravi.clicks, meera.eats and an imagined asha.art. The name column holds Asha twice, so it is
+				not unique and cannot be a key.
+			</desc>
+
+			<!-- Table frame -->
+			<rect
+				x={FRAME.x}
+				y={FRAME.y}
+				width={FRAME.width}
+				height={FRAME.height}
+				rx="14"
+				fill="var(--color-surface)"></rect>
+
+			<!-- Highlights: the two candidate keys, and the repeated names -->
+			<rect
+				x={FRAME.x + 6}
+				y={FRAME.y + 6}
+				width="50"
+				height={FRAME.height - 12}
+				rx="8"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"></rect>
+			<rect
+				x="164"
+				y={FRAME.y + 6}
+				width="150"
+				height={FRAME.height - 12}
+				rx="8"
+				fill="var(--color-sky)"
+				fill-opacity="0.16"></rect>
+			{
+				REPEATED_ROWS.map((rowIndex) => (
+					<rect
+						x="350"
+						y={rowTop(rowIndex) + 4}
+						width="74"
+						height={ROW_HEIGHT - 8}
+						rx="6"
+						fill="var(--color-rose)"
+						fill-opacity="0.14"
+						stroke="var(--color-rose)"
+						stroke-width="2"
+					/>
+				))
+			}
+
+			<!-- Table rules -->
+			<line
+				x1={FRAME.x + 16}
+				y1={ROW_TOP}
+				x2={FRAME.x + FRAME.width - 16}
+				y2={ROW_TOP}
+				stroke="var(--color-gray-700)"></line>
+			{
+				ROWS.slice(1).map((_, index) => (
+					<line
+						x1={FRAME.x + 16}
+						y1={rowTop(index + 1)}
+						x2={FRAME.x + FRAME.width - 16}
+						y2={rowTop(index + 1)}
+						stroke="var(--color-gray-800)"
+					/>
+				))
+			}
+
+			<!-- Header and cells -->
+			<g font-family="var(--font-sans)" font-size="16">
+				{
+					COLUMNS.map((column) => (
+						<text
+							x={column.x}
+							y={HEADER_BASELINE}
+							text-anchor={column.anchor}
+							font-size="15"
+							font-weight={'tone' in column ? 600 : 400}
+							fill={'tone' in column ? column.tone : 'var(--color-ink-muted)'}
+						>
+							{column.label}
+						</text>
+					))
+				}
+				{
+					ROWS.map((row, rowIndex) =>
+						row.map((value, columnIndex) => {
+							const column = COLUMNS[columnIndex];
+							const isRepeated = columnIndex === NAME_COLUMN && REPEATED_ROWS.includes(rowIndex);
+							return (
+								<text
+									x={column.x}
+									y={rowTop(rowIndex) + 28}
+									text-anchor={column.anchor}
+									font-weight={'tone' in column || isRepeated ? 600 : 400}
+									fill={
+										'tone' in column
+											? column.tone
+											: isRepeated
+												? 'var(--color-rose)'
+												: 'var(--color-ink-soft)'
+									}
+								>
+									{value}
+								</text>
+							);
+						}),
+					)
+				}
+			</g>
+
+			<!-- Labels under the key columns -->
+			<g font-family="var(--font-sans)" font-size="12" font-weight="600" letter-spacing="1.2">
+				<text x={FRAME.x + 6} y="342" fill="var(--color-mint)">PRIMARY KEY</text>
+				<text x="176" y="342" fill="var(--color-sky)">UNIQUE</text>
+			</g>
+
+			<!-- Annotations: a bracket over both candidates, arrows to the repeated names -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M70 70 L70 60 L310 60 L310 70"></path>
+				<path d="M520 172 C 516 154, 460 150, 440 150"></path>
+				<path d="M440 150 l9 6.3 M440 150 l9 -6.3"></path>
+				<path d="M512 256 C 500 274, 462 282, 440 282"></path>
+				<path d="M440 282 l9 6.3 M440 282 l9 -6.3"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="26"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="190" y="46" text-anchor="middle">candidate keys</text>
+				<text x="500" y="212">Asha twice,</text>
+				<text x="500" y="238">so not unique</text>
+			</g>
+		</svg>
+	</div>
+</figure>

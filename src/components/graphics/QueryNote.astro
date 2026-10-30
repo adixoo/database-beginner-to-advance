@@ -1,0 +1,54 @@
+---
+// One handwritten note with its curved arrow, drawn inside a parent <svg> (DESIGN.md annotation:
+// target, arrow, note). `x`/`y` is the arrow's tip, which the caller places 12-16px short of the
+// target. `left`: the note sits to the right and points left. `up`: the note sits below and
+// points up.
+
+interface Props {
+	x: number;
+	y: number;
+	lines: string[];
+	direction?: 'left' | 'up';
+}
+
+const LINE_HEIGHT = 24;
+
+const { x, y, lines, direction = 'left' } = Astro.props;
+const isLeft = direction === 'left';
+const curve = isLeft
+	? `M${x + 22} ${y + 4} C ${x + 16} ${y}, ${x + 10} ${y}, ${x} ${y}`
+	: `M${x + 2} ${y + 24} C ${x + 4} ${y + 14}, ${x + 2} ${y + 6}, ${x} ${y}`;
+const head = isLeft
+	? `M${x} ${y} l9 6.3 M${x} ${y} l9 -6.3`
+	: `M${x} ${y} l-6.3 9 M${x} ${y} l6.3 9`;
+const textX = isLeft ? x + 28 : x;
+const firstBaseline = isLeft ? y + 8 : y + 46;
+---
+
+<g aria-hidden="true">
+	<g
+		fill="none"
+		stroke="var(--color-butter)"
+		stroke-width="3"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d={curve}></path>
+		<path d={head}></path>
+	</g>
+	<g
+		font-family="var(--font-hand)"
+		font-size="24"
+		font-weight="600"
+		fill="var(--color-butter)"
+		text-anchor={isLeft ? 'start' : 'middle'}
+	>
+		{
+			lines.map((line, index) => (
+				<text x={textX} y={firstBaseline + index * LINE_HEIGHT}>
+					{line}
+				</text>
+			))
+		}
+	</g>
+</g>

@@ -1,0 +1,116 @@
+---
+// One named table drawn inside a parent <svg>: its name above a frame, a mint tint on the key
+// column, a peach outline on linked rows, then the header and cells. All positions are in the
+// parent's SVG units, so arrows drawn by the parent line up with the rows.
+
+export interface SvgTableColumn {
+	label: string;
+	x: number;
+	anchor: 'start' | 'end';
+	key?: boolean;
+}
+
+interface Props {
+	name: string;
+	x: number;
+	y: number;
+	width: number;
+	columns: SvgTableColumn[];
+	rows: string[][];
+	// Highlighted key column: left edge and width of the tint
+	keyTint?: { x: number; width: number };
+	// Rows outlined because an arrow starts or ends there
+	linkedRows?: number[];
+}
+
+// Offsets from the frame's top edge
+const HEADER_BASELINE = 32;
+const ROWS_TOP = 48;
+const ROW_HEIGHT = 44;
+const BOTTOM_PADDING = 16;
+
+const { name, x, y, width, columns, rows, keyTint, linkedRows = [] } = Astro.props;
+const height = ROWS_TOP + rows.length * ROW_HEIGHT + BOTTOM_PADDING;
+const rowTop = (index: number): number => y + ROWS_TOP + index * ROW_HEIGHT;
+---
+
+<g font-family="var(--font-sans)">
+	<text x={x + 4} y={y - 14} font-size="17" font-weight="700" fill="var(--color-ink)">
+		{name}
+	</text>
+	<rect x={x} y={y} width={width} height={height} rx="14" fill="var(--color-surface)"></rect>
+	{
+		keyTint && (
+			<rect
+				x={keyTint.x}
+				y={y + 6}
+				width={keyTint.width}
+				height={height - 12}
+				rx="8"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"
+			/>
+		)
+	}
+	{
+		linkedRows.map((rowIndex) => (
+			<rect
+				x={x + 4}
+				y={rowTop(rowIndex) + 2}
+				width={width - 8}
+				height={ROW_HEIGHT - 4}
+				rx="8"
+				fill="var(--color-peach)"
+				fill-opacity="0.1"
+				stroke="var(--color-peach)"
+				stroke-width="2"
+			/>
+		))
+	}
+	<line
+		x1={x + 16}
+		y1={y + ROWS_TOP}
+		x2={x + width - 16}
+		y2={y + ROWS_TOP}
+		stroke="var(--color-gray-700)"></line>
+	{
+		columns.map((column) => (
+			<text
+				x={column.x}
+				y={y + HEADER_BASELINE}
+				text-anchor={column.anchor}
+				font-size="15"
+				font-weight={column.key ? 600 : 400}
+				fill={column.key ? 'var(--color-mint)' : 'var(--color-ink-muted)'}
+			>
+				{column.label}
+			</text>
+		))
+	}
+	{
+		rows.map((row, rowIndex) =>
+			row.map((value, columnIndex) => {
+				const column = columns[columnIndex];
+				const isLinked = linkedRows.includes(rowIndex);
+				return (
+					<text
+						x={column.x}
+						y={rowTop(rowIndex) + 28}
+						text-anchor={column.anchor}
+						font-size="16"
+						font-weight={column.key || isLinked ? 600 : 400}
+						fill={
+							column.key
+								? 'var(--color-mint)'
+								: isLinked
+									? 'var(--color-ink)'
+									: 'var(--color-ink-soft)'
+						}
+					>
+						{value}
+					</text>
+				);
+			}),
+		)
+	}
+</g>

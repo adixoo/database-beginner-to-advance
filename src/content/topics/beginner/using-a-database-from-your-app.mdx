@@ -1,0 +1,76 @@
+---
+title: Using a database from your app
+description: How backend code connects to a database, sends queries with placeholders and gets rows back, and why placeholders stop SQL injection.
+level: beginner
+order: 19
+---
+
+import Callout from '@/components/Callout.astro';
+import AppDatabaseFlow from '@/components/graphics/AppDatabaseFlow.astro';
+import SqlInjection from '@/components/graphics/SqlInjection.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Users never talk to the database directly. Your backend code does it for them, in three steps.
+
+## Connect, query, get rows
+
+<AppDatabaseFlow />
+
+Here it is in Node.js 24, which has SQLite built in as `node:sqlite`, using the `users` table from your course database file:
+
+```js
+import { DatabaseSync } from 'node:sqlite';
+
+// 1. Connect: open the database file
+const db = new DatabaseSync('instagram.db');
+
+// 2. Prepare the query, with ? where the value goes
+const findUser = db.prepare('SELECT * FROM users WHERE username = ?');
+
+// 3. Run it with the value, and get the row back
+const user = findUser.get('asha.codes');
+console.log(user.id, user.username); // 1 asha.codes
+```
+
+The `?` is a **placeholder**: the SQL and the value travel separately.
+
+## Never glue input into SQL
+
+Say someone types `' OR '1'='1` into a login form. Glued into the SQL text, the database receives this, which is true for every row:
+
+```sql
+SELECT * FROM users WHERE username = '' OR '1'='1';
+```
+
+<SqlInjection />
+
+```js
+const typed = "' OR '1'='1";
+
+// ✗ Glued in: the input becomes part of the SQL
+const glued = db.prepare(`SELECT * FROM users WHERE username = '${typed}'`).all();
+console.log(glued.length); // 3
+
+// ✓ Placeholder: the input is only a value
+const safe = db.prepare('SELECT * FROM users WHERE username = ?').all(typed);
+console.log(safe.length); // 0
+```
+
+<Callout type="danger">
+
+Always pass user input with a placeholder. Gluing it into the SQL text is called **SQL injection**, and it lets anyone read, change or delete your data.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Placeholder**
+  A ? in the SQL where a value goes, sent separately from the query.
+- **Prepared statement**
+  A query with placeholders, ready to run with different values.
+- **SQL injection**
+  An attack where typed input is glued into SQL and runs as code.
+
+</WordsToKnow>

@@ -1,0 +1,170 @@
+---
+title: Joining tables
+description: A JOIN reads linked tables together by matching their keys, so you can show each post with the name of its author.
+level: beginner
+order: 8
+---
+
+import InnerJoin from '@/components/graphics/InnerJoin.astro';
+import InstagramData from '@/components/graphics/InstagramData.astro';
+import FullJoin from '@/components/graphics/FullJoin.astro';
+import LeftJoin from '@/components/graphics/LeftJoin.astro';
+import RightJoin from '@/components/graphics/RightJoin.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+[Relationships](/beginner/table-relationships) split data across tables: a post stores `user_id = 1`, not the username. A **JOIN** puts the pieces back together when you read them, by matching a foreign key to the primary key it points to.
+
+## The data so far
+
+Nothing to set up: the database you built in the earlier topics already holds everything these examples need. Here are its `users`, `posts` and `likes` tables:
+
+<InstagramData />
+
+## INNER JOIN
+
+A post only stores a `user_id`, not a username. To show each post with its author's username, join the two tables:
+
+```sql
+SELECT *
+FROM posts
+JOIN users ON posts.user_id = users.id;
+```
+
+Read it line by line:
+
+1. `FROM posts`: start with the posts.
+2. `JOIN users ON posts.user_id = users.id`: for each post, find the user whose `id` matches the post's `user_id`.
+3. `SELECT *`: show every column.
+
+Each post is glued to its matching user, so every row of the result has all the columns of both tables:
+
+<InnerJoin />
+
+`JOIN` is short for `INNER JOIN`: it keeps only matches. Meera has no posts, so `meera.eats` is left out.
+
+You rarely need every column. Name the ones you want instead, with the table name in front, because both tables have an `id`:
+
+```sql
+SELECT posts.caption, users.username
+FROM posts
+JOIN users ON posts.user_id = users.id;
+```
+
+| caption             | username    |
+| ------------------- | ----------- |
+| Sunset at the beach | asha.codes  |
+| First latte art     | ravi.clicks |
+| Weekend trek        | asha.codes  |
+
+## LEFT JOIN
+
+To keep every row from the first table, even with no match, use `LEFT JOIN`. Missing values come back as `NULL`, meaning "nothing here". Here `u` and `p` are short names, called **aliases**, so the query is easier to read:
+
+```sql
+SELECT u.username, p.caption
+FROM users AS u
+LEFT JOIN posts AS p ON p.user_id = u.id
+ORDER BY u.id, p.id;
+```
+
+This time `users` comes first, so every user is kept, matched or not:
+
+<LeftJoin />
+
+Asha appears twice, once per post, and Meera appears with no post. Use `LEFT JOIN` when the question is "every user, and their posts if they have any".
+
+## RIGHT JOIN
+
+`RIGHT JOIN` is the mirror of `LEFT JOIN`: it keeps every row from the second table, the one named after `RIGHT JOIN`. Here that is `users`, so every user is kept, even with no posts:
+
+```sql
+SELECT *
+FROM posts
+RIGHT JOIN users ON posts.user_id = users.id;
+```
+
+<RightJoin />
+
+Meera has no posts, so the posts columns of Meera's row are `NULL`. `FROM users LEFT JOIN posts` gives the same rows, which is why most people just use `LEFT JOIN`.
+
+## FULL JOIN
+
+`FULL JOIN` keeps every row from both tables. Right now every post has a user, so it would give the same rows as the `RIGHT JOIN` above. To see the difference, add a post whose author deleted their account, so user 4 no longer exists:
+
+```sql
+PRAGMA foreign_keys = OFF;
+INSERT INTO posts VALUES (104, 4, 'Old post');
+```
+
+[Foreign key checks](/beginner/keys#foreign-keys) would refuse a post for a user who doesn't exist, so switch them off for this one insert. Now join the tables:
+
+```sql
+SELECT *
+FROM posts
+FULL JOIN users ON posts.user_id = users.id;
+```
+
+<FullJoin />
+
+Post 104 has no user, so its users columns are `NULL`. Meera has no posts, so the posts columns of Meera's row are `NULL`. Both still appear.
+
+Now remove the old post again and switch the checks back on, so later topics start from the same data:
+
+```sql
+DELETE FROM posts WHERE id = 104;
+PRAGMA foreign_keys = ON;
+```
+
+`RIGHT JOIN` and `FULL JOIN` need SQLite 3.39 or newer.
+
+## Joining three tables
+
+A many-to-many relationship goes through the junction table, so you join twice. Who liked which post:
+
+```sql
+SELECT u.username, p.caption
+FROM likes AS l
+JOIN users AS u ON u.id = l.user_id
+JOIN posts AS p ON p.id = l.post_id
+ORDER BY l.post_id, l.user_id;
+```
+
+| username    | caption             |
+| ----------- | ------------------- |
+| ravi.clicks | Sunset at the beach |
+| meera.eats  | Sunset at the beach |
+| asha.codes  | First latte art     |
+
+## Which join to use
+
+| Join         | Keeps                                         |
+| ------------ | --------------------------------------------- |
+| `INNER JOIN` | Only rows with a match in both tables         |
+| `LEFT JOIN`  | Every row from the first table, plus matches  |
+| `RIGHT JOIN` | Every row from the second table, plus matches |
+| `FULL JOIN`  | Every row from both tables                    |
+
+You will use `INNER JOIN` and `LEFT JOIN` almost all the time. A `RIGHT JOIN` is a `LEFT JOIN` with the tables swapped, and MySQL has no `FULL JOIN` at all.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Alias**
+  A short name for a table in a query, such as u for users.
+- **FULL JOIN**
+  A join that keeps every row from both tables, matched or not.
+- **INNER JOIN**
+  A join that keeps only rows with a match in both tables.
+- **JOIN**
+  Reading two tables together by matching their keys.
+- **LEFT JOIN**
+  A join that keeps every row from the first table, matched or not.
+- **NULL**
+  The value for "nothing here", such as a missing match.
+- **ON**
+  The part of a join that says which rows belong together.
+- **RIGHT JOIN**
+  A join that keeps every row from the second table, matched or not.
+
+</WordsToKnow>

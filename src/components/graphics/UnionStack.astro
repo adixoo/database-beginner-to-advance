@@ -1,0 +1,180 @@
+---
+// UNION ALL vs UNION. The user_ids from posts (sky) and from likes on post 101 (peach) are
+// stacked into one column by UNION ALL, repeats included (rose outline); UNION then drops the
+// repeats. Each value is a chip. Handwritten notes follow DESIGN.md (target, arrow, note).
+// Below ~480px it scrolls sideways.
+
+type Source = 'posts' | 'likes';
+
+interface Chip {
+	value: string;
+	from: Source;
+	repeat?: boolean;
+}
+
+const TONE: Record<Source, string> = { posts: 'var(--color-sky)', likes: 'var(--color-peach)' };
+
+const COLUMNS: { title: string; mono: boolean; x: number; top: number; chips: Chip[] }[] = [
+	{
+		title: 'from posts',
+		mono: false,
+		x: 40,
+		top: 56,
+		chips: [
+			{ value: '1', from: 'posts' },
+			{ value: '2', from: 'posts' },
+			{ value: '1', from: 'posts' },
+			{ value: '2', from: 'posts' },
+			{ value: '2', from: 'posts' },
+		],
+	},
+	{
+		title: 'from likes',
+		mono: false,
+		x: 40,
+		top: 326,
+		chips: [
+			{ value: '2', from: 'likes' },
+			{ value: '3', from: 'likes' },
+		],
+	},
+	{
+		title: 'UNION ALL',
+		mono: true,
+		x: 300,
+		top: 56,
+		chips: [
+			{ value: '1', from: 'posts' },
+			{ value: '2', from: 'posts' },
+			{ value: '1', from: 'posts', repeat: true },
+			{ value: '2', from: 'posts', repeat: true },
+			{ value: '2', from: 'posts', repeat: true },
+			{ value: '2', from: 'likes', repeat: true },
+			{ value: '3', from: 'likes' },
+		],
+	},
+	{
+		title: 'UNION',
+		mono: true,
+		x: 520,
+		top: 56,
+		chips: [
+			{ value: '1', from: 'posts' },
+			{ value: '2', from: 'posts' },
+			{ value: '3', from: 'likes' },
+		],
+	},
+];
+
+const CHIP = { width: 60, height: 36, gap: 8 };
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="UNION and UNION ALL diagram" tabindex="0">
+		<svg
+			viewBox="0 0 620 430"
+			class="w-full min-w-[480px]"
+			role="img"
+			aria-labelledby="ust-title ust-desc"
+		>
+			<title id="ust-title">UNION ALL keeps repeats, UNION drops them</title>
+			<desc id="ust-desc">
+				posts gives user_ids 1, 2, 1, 2, 2. likes on post 101 gives 2, 3. UNION ALL stacks them all:
+				1, 2, 1, 2, 2, 2, 3, so 1 and 2 repeat. UNION drops the repeats and gives 1, 2, 3.
+			</desc>
+
+			{
+				COLUMNS.map((column) => (
+					<g>
+						<text
+							x={column.x + CHIP.width / 2}
+							y={column.top - 14}
+							text-anchor="middle"
+							font-family={column.mono ? 'var(--font-mono)' : 'var(--font-sans)'}
+							font-size={column.mono ? 14 : 13}
+							fill="var(--color-ink-muted)"
+						>
+							{column.title}
+						</text>
+						{column.chips.map((chip, index) => {
+							const y = column.top + index * (CHIP.height + CHIP.gap);
+							return (
+								<g>
+									<rect
+										x={column.x}
+										y={y}
+										width={CHIP.width}
+										height={CHIP.height}
+										rx="8"
+										fill={TONE[chip.from]}
+										fill-opacity="0.16"
+										stroke={chip.repeat ? 'var(--color-rose)' : 'none'}
+										stroke-width="2"
+									/>
+									<text
+										x={column.x + CHIP.width / 2}
+										y={y + 24}
+										text-anchor="middle"
+										font-family="var(--font-sans)"
+										font-size="17"
+										font-weight="600"
+										fill={TONE[chip.from]}
+									>
+										{chip.value}
+									</text>
+								</g>
+							);
+						})}
+					</g>
+				))
+			}
+
+			<!-- inputs → UNION ALL → UNION -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M118 200 C 170 190, 230 190, 282 200"></path>
+				<path d="M282 200 l-7.3 -8.3 M282 200 l-10.2 4"></path>
+				<path d="M378 200 C 430 190, 470 190, 502 200"></path>
+				<path d="M502 200 l-7.3 -8.3 M502 200 l-10.2 4"></path>
+			</g>
+			<g
+				font-family="var(--font-sans)"
+				font-size="13"
+				fill="var(--color-ink-muted)"
+				text-anchor="middle"
+				aria-hidden="true"
+			>
+				<text x="200" y="180">stack both</text>
+				<text x="440" y="180">drop repeats</text>
+			</g>
+
+			<!-- Annotation: arrow ends 12-16px short of the repeats -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M420 282 C 404 272, 390 258, 376 250"></path>
+				<path d="M376 250 l4.7 10 M376 250 l11 -1"></path>
+			</g>
+			<text
+				x="426"
+				y="302"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">repeats</text
+			>
+		</svg>
+	</div>
+</figure>

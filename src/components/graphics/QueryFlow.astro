@@ -1,0 +1,118 @@
+---
+// A whole "table in, query, table out" graphic: the input table on top with the rows the query
+// keeps outlined (peach) and the others dimmed, an arrow down labelled with the query step, and
+// the result table below. Notes go in the default slot, drawn on top in the same SVG units.
+//
+// Layout, for placing notes: both tables start at x = 10. The input table's top is y = 40 and
+// its rows are centred at y = 108 + 44 * i. The result table's top is
+// resultTop = 40 + inputHeight + 84, where a table's height is 64 + 44 * rows, and its rows are
+// centred at resultTop + 68 + 44 * i.
+import SvgTable, { type SvgTableColumn } from './SvgTable.astro';
+
+interface TableSpec {
+	name?: string;
+	width: number;
+	columns: SvgTableColumn[];
+	rows: string[][];
+	keyTint?: { x: number; width: number };
+}
+
+interface Props {
+	label: string;
+	title: string;
+	desc: string;
+	// Unique per graphic, for the title and desc ids
+	id: string;
+	input: TableSpec;
+	// Rows the query keeps; the rest are dimmed. Leave out to keep every row as it is.
+	keep?: number[];
+	step: string;
+	result: TableSpec;
+	// SVG width; wider graphics scroll sideways in their frame
+	width?: number;
+}
+
+const TABLE_X = 10;
+const INPUT_TOP = 40;
+const tableHeight = (rows: number): number => 64 + rows * 44;
+
+const { label, title, desc, id, input, keep, step, result, width = 600 } = Astro.props;
+const inputBottom = INPUT_TOP + tableHeight(input.rows.length);
+const arrowTop = inputBottom + 8;
+const resultTop = inputBottom + 84;
+const height = resultTop + tableHeight(result.rows.length) + 20;
+const dimmed = keep ? input.rows.map((_, index) => index).filter((i) => !keep.includes(i)) : [];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label={label} tabindex="0">
+		<svg
+			viewBox={`0 0 ${width} ${height}`}
+			class="w-full"
+			style={`min-width: ${Math.round(width * 0.8)}px`}
+			role="img"
+			aria-labelledby={`${id}-title ${id}-desc`}
+		>
+			<title id={`${id}-title`}>{title}</title>
+			<desc id={`${id}-desc`}>{desc}</desc>
+
+			<SvgTable
+				name={input.name ?? 'posts'}
+				x={TABLE_X}
+				y={INPUT_TOP}
+				width={input.width}
+				columns={input.columns}
+				rows={input.rows}
+				keyTint={input.keyTint}
+				linkedRows={keep}
+			/>
+			{
+				dimmed.map((rowIndex) => (
+					<rect
+						x={TABLE_X + 4}
+						y={INPUT_TOP + 48 + rowIndex * 44 + 2}
+						width={input.width - 8}
+						height="40"
+						rx="8"
+						fill="var(--color-canvas)"
+						opacity="0.6"
+					/>
+				))
+			}
+
+			<g aria-hidden="true">
+				<g
+					fill="none"
+					stroke="var(--color-ink-muted)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path
+						d={`M60 ${arrowTop} C 62 ${arrowTop + 12}, 58 ${arrowTop + 28}, 60 ${arrowTop + 42}`}
+					></path>
+					<path d={`M60 ${arrowTop + 42} l-6.3 -9 M60 ${arrowTop + 42} l6.3 -9`}></path>
+				</g>
+				<text
+					x="78"
+					y={arrowTop + 28}
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink-muted)">{step}</text
+				>
+			</g>
+
+			<SvgTable
+				name={result.name ?? 'result'}
+				x={TABLE_X}
+				y={resultTop}
+				width={result.width}
+				columns={result.columns}
+				rows={result.rows}
+				keyTint={result.keyTint}
+			/>
+
+			<slot />
+		</svg>
+	</div>
+</figure>

@@ -1,0 +1,112 @@
+---
+// A view never goes stale: a post added to `posts` (peach) shows up the next time the view is
+// read (peach), with nothing to copy or refresh. Handwritten notes follow DESIGN.md (target,
+// arrow, note). One SVG so the arrows stay locked to the rows; it scrolls sideways when the
+// column is narrower than ~460px.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Live view diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 800"
+			class="w-full min-w-[460px]"
+			role="img"
+			aria-labelledby="vl-title vl-desc"
+		>
+			<title id="vl-title">A new post shows up in the view straight away</title>
+			<desc id="vl-desc">
+				A new post, Homemade pasta by user 3, is added to the posts table, after posts 101 to 105.
+				Reading the post_authors view now returns six rows, the last one being Homemade pasta by
+				meera.eats. The view stores no rows, so there is nothing to refresh.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={20}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'user_id', x: 100, anchor: 'end', key: true },
+					{ label: 'caption', x: 126, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'Sunset at the beach'],
+					['2', 'First latte art'],
+					['1', 'Weekend trek'],
+					['2', 'Street tacos'],
+					['2', 'NULL'],
+					['3', 'Homemade pasta'],
+				]}
+				keyTint={{ x: 42, width: 66 }}
+				linkedRows={[5]}
+			/>
+
+			<g aria-hidden="true">
+				<g
+					fill="none"
+					stroke="var(--color-ink-muted)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M185 376 C 187 388, 183 404, 185 418"></path>
+					<path d="M185 418 l5 -9.8 M185 418 l-7.5 -8"></path>
+				</g>
+				<text
+					x="201"
+					y="402"
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink-muted)">SELECT * FROM post_authors</text
+				>
+			</g>
+
+			<SvgTable
+				name="post_authors"
+				x={20}
+				y={454}
+				width={330}
+				columns={[
+					{ label: 'caption', x: 40, anchor: 'start' },
+					{ label: 'username', x: 220, anchor: 'start' },
+				]}
+				rows={[
+					['Sunset at the beach', 'asha.codes'],
+					['First latte art', 'ravi.clicks'],
+					['Weekend trek', 'asha.codes'],
+					['Street tacos', 'ravi.clicks'],
+					['NULL', 'ravi.clicks'],
+					['Homemade pasta', 'meera.eats'],
+				]}
+				linkedRows={[5]}
+			/>
+
+			<!-- Annotations: arrows end 14px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M392 320 C 384 314, 372 320, 364 328"></path>
+				<path d="M364 328 l10.8 -1.9 M364 328 l1.9 -10.8"></path>
+				<path d="M392 734 C 384 728, 372 734, 364 742"></path>
+				<path d="M364 742 l10.8 -1.9 M364 742 l1.9 -10.8"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="398" y="328">a new post</text>
+				<text x="398" y="742">already in the view,</text>
+				<text x="398" y="766">nothing to refresh</text>
+			</g>
+		</svg>
+	</div>
+</figure>

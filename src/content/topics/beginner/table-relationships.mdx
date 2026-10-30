@@ -1,0 +1,99 @@
+---
+title: Table relationships
+description: Tables link to each other in three ways, one-to-one, one-to-many and many-to-many, and each is built with keys.
+level: beginner
+order: 7
+---
+
+import InstagramTables from '@/components/graphics/InstagramTables.astro';
+import OneToMany from '@/components/graphics/OneToMany.astro';
+import OneToOne from '@/components/graphics/OneToOne.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Tables link to each other through [foreign keys](/beginner/keys#foreign-keys). A **relationship** describes how many rows on each side can be linked, and there are only three kinds:
+
+| Relationship | Means                       | Instagram example             |
+| ------------ | --------------------------- | ----------------------------- |
+| One-to-one   | One row links to one row    | A user and their settings     |
+| One-to-many  | One row links to many rows  | A user and their posts        |
+| Many-to-many | Many rows link to many rows | Users and the posts they like |
+
+## One-to-one
+
+Each user has exactly one row of settings, and each settings row belongs to one user:
+
+<OneToOne />
+
+Make the foreign key the primary key too, so a user can never get a second row:
+
+```sql
+CREATE TABLE user_settings (
+  user_id INTEGER PRIMARY KEY REFERENCES users (id),
+  dark_mode INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO user_settings (user_id, dark_mode) VALUES (1, 1), (2, 0);
+```
+
+A second row for the same user fails with `UNIQUE constraint failed: user_settings.user_id`.
+
+One-to-one is the rarest kind. Often the columns can simply go in the main table; a separate table helps when the data is optional or rarely read.
+
+## One-to-many
+
+One user writes many posts, but each post has one author. This is the most common relationship, and you have already built it: the foreign key goes on the "many" side, so `posts` gets a `user_id` column:
+
+<OneToMany />
+
+Posts 101 and 103 both hold `user_id` 1, so both belong to `asha.codes`. Your `posts` table already works this way: its `user_id INTEGER NOT NULL REFERENCES users (id)` column comes from [Create your first database](/beginner/create-your-first-database#create-the-tables).
+
+## Many-to-many
+
+One user likes many posts, and one post is liked by many users. A single foreign key cannot hold "many", so you add a third table in between, called a **junction table**. Each row in `likes` links one user to one post:
+
+<InstagramTables />
+
+Post `101` is liked by users `2` and `3`, and user `1` likes post `102`. Here is the junction table in SQL:
+
+```sql
+CREATE TABLE likes (
+  user_id INTEGER NOT NULL REFERENCES users (id),
+  post_id INTEGER NOT NULL REFERENCES posts (id),
+  PRIMARY KEY (user_id, post_id)
+);
+
+INSERT INTO likes (user_id, post_id) VALUES (2, 101), (3, 101), (1, 102);
+```
+
+The primary key is the two columns together, a **composite key**. It stops anyone liking the same post twice: a second `(1, 102)` fails with `UNIQUE constraint failed: likes.user_id, likes.post_id`.
+
+## Which one is it?
+
+Ask two questions about any pair of things, A and B:
+
+| Can one A have many B? | Can one B have many A? | Relationship |
+| ---------------------- | ---------------------- | ------------ |
+| No                     | No                     | One-to-one   |
+| Yes                    | No                     | One-to-many  |
+| Yes                    | Yes                    | Many-to-many |
+
+Try it on users and posts: one user can have many posts (yes), but one post cannot have many authors (no), so it is one-to-many. To read linked tables back together, use [joins](/beginner/joins).
+
+## Words to know
+
+<WordsToKnow>
+
+- **Composite key**
+  A primary key made of two or more columns together.
+- **Junction table**
+  A table in between that links two tables many-to-many.
+- **Many-to-many**
+  Many rows on each side can link to many on the other.
+- **One-to-many**
+  One row links to many rows, but each of those links back to one.
+- **One-to-one**
+  Each row links to exactly one row in the other table.
+- **Relationship**
+  How rows in two tables are linked, and how many on each side.
+
+</WordsToKnow>

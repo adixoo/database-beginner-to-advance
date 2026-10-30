@@ -1,0 +1,189 @@
+---
+// UNION, INTERSECT and EXCEPT as four small Venn diagrams. The left circle is the user_ids in
+// posts (1, 2), the right one the user_ids that liked post 101 (2, 3). The shaded (mint) area
+// is what each operation returns; its result is written underneath. Handwritten notes follow
+// DESIGN.md (target, arrow, note). Below ~500px it scrolls sideways.
+
+type Shade = 'both' | 'overlap' | 'left' | 'right';
+
+const PANELS: { title: string; shade: Shade; result: string; centre: number }[] = [
+	{ title: 'UNION', shade: 'both', result: '1, 2, 3', centre: 95 },
+	{ title: 'INTERSECT', shade: 'overlap', result: '2', centre: 265 },
+	{ title: 'posts EXCEPT likes', shade: 'left', result: '1', centre: 435 },
+	{ title: 'likes EXCEPT posts', shade: 'right', result: '3', centre: 605 },
+];
+
+const CY = 110;
+const R = 44;
+const OFFSET = 26;
+
+// Which numbers sit in the shaded area for each operation
+const SHADED: Record<Shade, string[]> = {
+	both: ['1', '2', '3'],
+	overlap: ['2'],
+	left: ['1'],
+	right: ['3'],
+};
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Set operations diagram" tabindex="0">
+		<svg
+			viewBox="0 0 700 256"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="sop-title sop-desc"
+		>
+			<title id="sop-title">UNION, INTERSECT and EXCEPT as overlapping circles</title>
+			<desc id="sop-desc">
+				The left circle holds the user_ids that posted, 1 and 2. The right circle holds the user_ids
+				that liked post 101, 2 and 3. 2 is in both. UNION returns everything: 1, 2, 3. INTERSECT
+				returns only the overlap: 2. posts EXCEPT likes returns what is only on the left: 1. likes
+				EXCEPT posts returns what is only on the right: 3.
+			</desc>
+
+			<defs>
+				{
+					PANELS.map((panel, index) => {
+						const left = panel.centre - OFFSET;
+						const right = panel.centre + OFFSET;
+						return (
+							<>
+								<clipPath id={`sop-clip-${index}`}>
+									<circle cx={right} cy={CY} r={R} />
+								</clipPath>
+								<mask id={`sop-mask-${index}`}>
+									<circle cx={panel.shade === 'right' ? right : left} cy={CY} r={R} fill="white" />
+									<circle cx={panel.shade === 'right' ? left : right} cy={CY} r={R} fill="black" />
+								</mask>
+							</>
+						);
+					})
+				}
+			</defs>
+
+			{
+				PANELS.map((panel, index) => {
+					const left = panel.centre - OFFSET;
+					const right = panel.centre + OFFSET;
+					const shaded = SHADED[panel.shade];
+					const numbers = [
+						{ value: '1', x: panel.centre - 46 },
+						{ value: '2', x: panel.centre },
+						{ value: '3', x: panel.centre + 46 },
+					];
+					return (
+						<g>
+							<text
+								x={panel.centre}
+								y="34"
+								text-anchor="middle"
+								font-family="var(--font-mono)"
+								font-size="13"
+								fill="var(--color-ink-muted)"
+							>
+								{panel.title}
+							</text>
+
+							{/* The shaded area */}
+							{panel.shade === 'both' && (
+								<g fill="var(--color-mint)" opacity="0.22">
+									<circle cx={left} cy={CY} r={R} />
+									<circle cx={right} cy={CY} r={R} />
+								</g>
+							)}
+							{panel.shade === 'overlap' && (
+								<circle
+									cx={left}
+									cy={CY}
+									r={R}
+									fill="var(--color-mint)"
+									opacity="0.22"
+									clip-path={`url(#sop-clip-${index})`}
+								/>
+							)}
+							{(panel.shade === 'left' || panel.shade === 'right') && (
+								<rect
+									x={left - R}
+									y={CY - R}
+									width={2 * R + 2 * OFFSET}
+									height={2 * R}
+									fill="var(--color-mint)"
+									opacity="0.22"
+									mask={`url(#sop-mask-${index})`}
+								/>
+							)}
+
+							<g fill="none" stroke="var(--color-gray-600)" stroke-width="2">
+								<circle cx={left} cy={CY} r={R} />
+								<circle cx={right} cy={CY} r={R} />
+							</g>
+
+							{numbers.map((number) => {
+								const isShaded = shaded.includes(number.value);
+								return (
+									<text
+										x={number.x}
+										y={CY + 6}
+										text-anchor="middle"
+										font-family="var(--font-sans)"
+										font-size="17"
+										font-weight={isShaded ? 600 : 400}
+										fill={isShaded ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+									>
+										{number.value}
+									</text>
+								);
+							})}
+
+							<g font-family="var(--font-sans)" font-size="12" fill="var(--color-ink-muted)">
+								<text x={left - R + 2} y={CY + R + 16}>
+									posts
+								</text>
+								<text x={right + R - 2} y={CY + R + 16} text-anchor="end">
+									likes
+								</text>
+							</g>
+							<text
+								x={panel.centre}
+								y="196"
+								text-anchor="middle"
+								font-family="var(--font-sans)"
+								font-size="17"
+								font-weight="600"
+								fill="var(--color-ink)"
+							>
+								{panel.result}
+							</text>
+						</g>
+					);
+				})
+			}
+
+			<!-- Annotation: one note, an arrow to each EXCEPT result -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M480 226 C 468 222, 454 214, 446 206"></path>
+				<path d="M446 206 l1.9 10.9 M446 206 l10.9 1.9"></path>
+				<path d="M560 226 C 572 222, 586 214, 594 206"></path>
+				<path d="M594 206 l-10.9 1.9 M594 206 l-1.9 10.9"></path>
+			</g>
+			<text
+				x="520"
+				y="242"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">order matters</text
+			>
+		</svg>
+	</div>
+</figure>

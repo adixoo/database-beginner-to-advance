@@ -1,0 +1,109 @@
+---
+// ROLLBACK as three snapshots: the accounts before, the empty table after DELETE inside the
+// transaction (rose), and the same rows back again after ROLLBACK. Handwritten note follows
+// DESIGN.md. Below ~600px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+const COLUMNS = (x: number) => [
+	{ label: 'id', x: x + 36, anchor: 'end' as const },
+	{ label: 'name', x: x + 60, anchor: 'start' as const },
+	{ label: 'balance', x: x + 176, anchor: 'end' as const },
+];
+const ACCOUNTS = [
+	['1', 'Asha', '300'],
+	['2', 'Ravi', '300'],
+];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="ROLLBACK diagram" tabindex="0">
+		<svg
+			viewBox="0 0 780 264"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="rb-title rb-desc"
+		>
+			<title id="rb-title">ROLLBACK undoes everything since BEGIN</title>
+			<desc id="rb-desc">
+				Before: accounts has Asha with 300 and Ravi with 300. Inside the transaction, DELETE removes
+				both rows, so the table is empty. After ROLLBACK, both rows are back exactly as they were.
+			</desc>
+
+			<SvgTable name="before" x={10} y={50} width={200} columns={COLUMNS(10)} rows={ACCOUNTS} />
+			<SvgTable
+				name="after DELETE"
+				x={290}
+				y={50}
+				width={200}
+				columns={COLUMNS(290)}
+				rows={[['', '', '']]}
+			/>
+			<text
+				x="390"
+				y="124"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="15"
+				font-style="italic"
+				fill="var(--color-rose)">no rows</text
+			>
+			<SvgTable
+				name="after ROLLBACK"
+				x={570}
+				y={50}
+				width={200}
+				columns={COLUMNS(570)}
+				rows={ACCOUNTS}
+				linkedRows={[0, 1]}
+			/>
+
+			<!-- The two steps -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M218 112 C 242 106, 260 106, 282 112"></path>
+				<path d="M282 112 l-8.1 -7.5 M282 112 l-9.8 5"></path>
+				<path d="M498 112 C 522 106, 540 106, 562 112"></path>
+				<path d="M562 112 l-8.1 -7.5 M562 112 l-9.8 5"></path>
+			</g>
+			<g
+				font-family="var(--font-mono)"
+				font-size="13"
+				font-weight="700"
+				text-anchor="middle"
+				aria-hidden="true"
+			>
+				<text x="250" y="94" fill="var(--color-rose)">DELETE</text>
+				<text x="530" y="94" fill="var(--color-mint)">ROLLBACK</text>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M670 230 C 672 226, 669 222, 670 216"></path>
+				<path d="M670 216 l-6.3 9 M670 216 l6.3 9"></path>
+			</g>
+			<text
+				x="670"
+				y="250"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">back as it was</text
+			>
+		</svg>
+	</div>
+</figure>

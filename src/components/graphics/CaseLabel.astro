@@ -1,0 +1,124 @@
+---
+// CASE adds a computed column: each post's views go through the CASE rule and come out as a
+// label, 'popular' when views >= 40, otherwise 'quiet'. Posts on the left, the rule as a code
+// card on the right, the result with its new label column (mint) below. Handwritten notes
+// follow DESIGN.md (target, arrow, note). Below ~480px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="CASE label diagram" tabindex="0">
+		<svg
+			viewBox="0 0 600 680"
+			class="w-full min-w-[480px]"
+			role="img"
+			aria-labelledby="csl-title csl-desc"
+		>
+			<title id="csl-title">CASE turns each post's views into a popular or quiet label</title>
+			<desc id="csl-desc">
+				The posts table has Sunset at the beach with 42 views, First latte art with 7, Weekend trek
+				with 15, Street tacos with 23 and a post with no caption with 3. The rule is: when views is
+				40 or more, the label is popular; otherwise it is quiet. The result adds a label column:
+				popular, then quiet for the other four.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={40}
+				width={280}
+				columns={[
+					{ label: 'caption', x: 30, anchor: 'start' },
+					{ label: 'views', x: 262, anchor: 'end' },
+				]}
+				rows={[
+					['Sunset at the beach', '42'],
+					['First latte art', '7'],
+					['Weekend trek', '15'],
+					['Street tacos', '23'],
+					['NULL', '3'],
+				]}
+			/>
+
+			<!-- The rule, as code -->
+			<rect x="330" y="56" width="260" height="156" rx="14" fill="var(--color-surface)"></rect>
+			<!-- One <text> per token at fixed mono columns (9 units per character at 15px), so
+			     formatting can't eat the spaces; ligatures off so >= stays two characters -->
+			<g
+				font-family="var(--font-mono)"
+				font-size="15"
+				fill="var(--color-ink)"
+				style="font-variant-ligatures: none"
+				aria-hidden="true"
+			>
+				<text x="352" y="90" fill="var(--color-lilac)">CASE</text>
+				<text x="372" y="116" fill="var(--color-lilac)">WHEN</text>
+				<text x="417" y="116">views &gt;=</text>
+				<text x="498" y="116" fill="var(--color-peach)">40</text>
+				<text x="392" y="142" fill="var(--color-lilac)">THEN</text>
+				<text x="437" y="142" fill="var(--color-mint)">'popular'</text>
+				<text x="372" y="168" fill="var(--color-lilac)">ELSE</text>
+				<text x="417" y="168" fill="var(--color-mint)">'quiet'</text>
+				<text x="352" y="194" fill="var(--color-lilac)">END</text>
+			</g>
+
+			<!-- posts → rule → result -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M294 138 C 306 134, 314 134, 322 138"></path>
+				<path d="M322 138 l-8.1 -7.5 M322 138 l-9.8 5"></path>
+				<path d="M430 218 C 432 280, 410 330, 392 352"></path>
+				<path d="M392 352 l10.5 -3 M392 352 l0.8 -10.9"></path>
+			</g>
+
+			<SvgTable
+				name="result"
+				x={10}
+				y={380}
+				width={420}
+				columns={[
+					{ label: 'caption', x: 30, anchor: 'start' },
+					{ label: 'views', x: 262, anchor: 'end' },
+					{ label: 'label', x: 296, anchor: 'start', key: true },
+				]}
+				rows={[
+					['Sunset at the beach', '42', 'popular'],
+					['First latte art', '7', 'quiet'],
+					['Weekend trek', '15', 'quiet'],
+					['Street tacos', '23', 'quiet'],
+					['NULL', '3', 'quiet'],
+				]}
+				keyTint={{ x: 284, width: 132 }}
+				linkedRows={[0]}
+			/>
+
+			<!-- Annotation: arrow ends 12-16px short of the new column -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M446 450 C 440 446, 436 446, 432 448"></path>
+				<path d="M432 448 l9 6.3 M432 448 l9 -6.3"></path>
+			</g>
+			<text
+				x="452"
+				y="458"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">a new column</text
+			>
+		</svg>
+	</div>
+</figure>

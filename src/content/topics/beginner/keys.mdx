@@ -1,0 +1,81 @@
+---
+title: Keys
+description: Keys are the columns that tell rows apart and link tables together, such as primary keys and foreign keys.
+level: beginner
+order: 6
+---
+
+import CandidateKey from '@/components/graphics/CandidateKey.astro';
+import ForeignKey from '@/components/graphics/ForeignKey.astro';
+import PrimaryKey from '@/components/graphics/PrimaryKey.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A **key** is a column that tells one row apart from the others, or links a row to a row in another table. We will use the `users` and `posts` tables from [Create your first database](/beginner/create-your-first-database).
+
+## Primary keys
+
+A **primary key** is the column that identifies each row. Every table has one, and its value must be:
+
+- **Unique:** no two rows share it.
+- **Never empty:** every row has one.
+
+In our tables, `id` is the primary key. Ask for `id = 1` and you always get exactly one user:
+
+<PrimaryKey />
+
+Your table already says so: you wrote `id INTEGER PRIMARY KEY` when you made `users` in [Create your first database](/beginner/create-your-first-database#create-the-tables).
+
+## Foreign keys
+
+A **foreign key** is a column that points to the primary key of another table. In `posts`, `user_id` is a foreign key: it holds the `id` of the user who wrote the post.
+
+<ForeignKey />
+
+"Sunset at the beach" has `user_id` 1, so it belongs to the user whose `id` is 1: `asha.codes`.
+
+The foreign key stops posts from pointing at users who do not exist. In SQLite, switch the check on first, once per connection:
+
+```sql
+PRAGMA foreign_keys = ON;
+
+INSERT INTO posts (user_id, caption) VALUES (99, 'Ghost post');
+-- Error: FOREIGN KEY constraint failed
+```
+
+## Candidate keys
+
+A **candidate key** is any column that could be the primary key, because it is unique and never empty. In `users`, both `id` and `username` qualify, but `name` does not: two users can both be called Asha. Imagine a fourth user, `asha.art`, who is also named Asha:
+
+<CandidateKey />
+
+You pick one candidate as the primary key. The others still get a `UNIQUE` rule, which is why `username` is `NOT NULL UNIQUE`: it is a candidate key that was not picked.
+
+## Natural vs surrogate keys
+
+So which candidate should be the primary key? There are two kinds to choose from:
+
+| Key       | What it is                        | Examples              |
+| --------- | --------------------------------- | --------------------- |
+| Natural   | Real data that is already unique  | Username, email, ISBN |
+| Surrogate | A number made up just to be a key | `id` 1, 2, 3          |
+
+Natural keys look tempting, but real data changes. If `username` were the primary key and Asha changed it, every post pointing at `asha.codes` would need changing too. A surrogate `id` never changes, because it means nothing outside the database.
+
+**Use a surrogate `id` as the primary key, and keep natural keys like `username` unique.** That is exactly what our `users` table does.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Candidate key**
+  Any column unique enough to be the primary key.
+- **Foreign key**
+  A column that points to the primary key of another table.
+- **Natural key**
+  A key made of real data, such as a username or email.
+- **Primary key**
+  The column that identifies each row: unique and never empty.
+- **Surrogate key**
+  A made-up number, such as id, used only as a key.
+
+</WordsToKnow>

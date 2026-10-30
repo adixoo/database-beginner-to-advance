@@ -1,0 +1,90 @@
+---
+// SQLite's query plan for `SELECT * FROM posts WHERE user_id = 1`, before and after
+// CREATE INDEX: SCAN (every row, rose) becomes SEARCH ... USING INDEX (mint). Below ~520px it
+// scrolls sideways.
+
+const PLANS = [
+	{
+		label: 'before',
+		plan: 'SCAN posts',
+		note: 'reads every row',
+		width: 120,
+		tone: 'var(--color-rose)',
+	},
+	{
+		label: 'after',
+		plan: 'SEARCH posts USING INDEX idx_posts_user_id (user_id=?)',
+		note: '',
+		width: 490,
+		tone: 'var(--color-mint)',
+	},
+];
+const ROW_GAP = 54;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Query plan diagram" tabindex="0">
+		<svg
+			viewBox="0 0 620 130"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="qp-title qp-desc"
+		>
+			<title id="qp-title">The query plan changes from SCAN to SEARCH</title>
+			<desc id="qp-desc">
+				Before the index, SQLite's plan is SCAN posts, which reads every row. After CREATE INDEX,
+				the plan is SEARCH posts USING INDEX idx_posts_user_id (user_id=?).
+			</desc>
+
+			{
+				PLANS.map((step, index) => {
+					const top = 18 + index * ROW_GAP;
+					return (
+						<g>
+							<text
+								x="10"
+								y={top + 22}
+								font-family="var(--font-sans)"
+								font-size="15"
+								fill="var(--color-ink-muted)"
+							>
+								{step.label}
+							</text>
+							<rect
+								x="96"
+								y={top}
+								width={step.width}
+								height="34"
+								rx="8"
+								fill={step.tone}
+								fill-opacity="0.14"
+								stroke={step.tone}
+								stroke-width="2"
+							/>
+							<text
+								x="112"
+								y={top + 22}
+								font-family="var(--font-mono)"
+								font-size="14"
+								fill="var(--color-ink)"
+							>
+								{step.plan}
+							</text>
+							{step.note && (
+								<text
+									x={96 + step.width + 16}
+									y={top + 22}
+									font-family="var(--font-sans)"
+									font-size="15"
+									fill="var(--color-ink-soft)"
+								>
+									{step.note}
+								</text>
+							)}
+						</g>
+					);
+				})
+			}
+		</svg>
+	</div>
+</figure>

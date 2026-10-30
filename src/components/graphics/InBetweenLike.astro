@@ -1,0 +1,25 @@
+---
+// IN, BETWEEN and LIKE side by side, each ticking the posts it matches.
+import { POSTS_COLUMNS, POSTS_ROWS } from './query-posts-data';
+import MatchGrid from './MatchGrid.astro';
+---
+
+<MatchGrid
+	id="ibl"
+	label="IN, BETWEEN and LIKE diagram"
+	title="The posts that IN, BETWEEN and LIKE each match"
+	desc="user_id IN (2, 3) matches posts 102, 104 and 105, the ones by user 2; user 3 has no posts. views BETWEEN 10 AND 30 matches posts 103 (15) and 104 (23). caption LIKE 'S%' matches Sunset at the beach and Street tacos. Post 101 matches only LIKE, and post 103 only BETWEEN."
+	columns={POSTS_COLUMNS}
+	rows={POSTS_ROWS}
+	checks={[
+		{ header: ['user_id', 'IN (2, 3)'], x: 470, values: [false, true, false, true, true] },
+		{
+			header: ['views', 'BETWEEN 10 AND 30'],
+			x: 615,
+			values: [false, false, true, true, false],
+		},
+		{ header: ['caption', "LIKE 'S%'"], x: 760, values: [true, false, false, true, false] },
+	]}
+	tableWidth={830}
+	dividerX={410}
+/>

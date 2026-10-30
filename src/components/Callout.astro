@@ -1,0 +1,51 @@
+---
+// A highlighted card inside a topic, coloured by how much it matters. Wrap Markdown in it:
+//
+//   <Callout type="danger">
+//
+//   **Always write the `WHERE` first.** Without it, …
+//
+//   </Callout>
+//
+// Each type has its own icon shape, so the meaning never rests on colour alone; screen readers
+// hear the type's name instead. A plain Markdown blockquote (`> …`) looks like `normal` without
+// the icon.
+import {
+	Alert02Icon,
+	BulbIcon,
+	InformationCircleIcon,
+	OctagonAlertIcon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+
+type CalloutType = 'normal' | 'info' | 'warning' | 'danger';
+
+interface Props {
+	type?: CalloutType;
+	class?: string;
+}
+
+const TONES = {
+	normal: { label: 'Note', icon: BulbIcon, card: 'bg-surface', tone: 'text-ink-soft' },
+	info: { label: 'Info', icon: InformationCircleIcon, card: 'bg-sky/14', tone: 'text-sky' },
+	warning: { label: 'Warning', icon: Alert02Icon, card: 'bg-butter/14', tone: 'text-butter' },
+	danger: { label: 'Danger', icon: OctagonAlertIcon, card: 'bg-rose/14', tone: 'text-rose' },
+} as const satisfies Record<CalloutType, object>;
+
+const { type = 'normal', class: className } = Astro.props;
+const { label, icon, card, tone } = TONES[type];
+---
+
+<aside class:list={['my-8 flex gap-4 rounded-[20px] px-6 py-5', card, className]}>
+	<HugeiconsIcon
+		icon={icon}
+		size={24}
+		strokeWidth={2}
+		className={`mt-[0.15em] shrink-0 ${tone}`}
+		aria-hidden="true"
+	/>
+	<span class="sr-only">{label}:</span>
+	<div class="min-w-0 *:first:mt-0 *:last:mb-0">
+		<slot />
+	</div>
+</aside>

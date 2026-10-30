@@ -1,0 +1,21 @@
+---
+// WHERE caption IS NULL: only the post with no caption is kept.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH, postsRows } from './query-posts-data';
+import QueryNote from './QueryNote.astro';
+import QueryFlow from './QueryFlow.astro';
+
+const KEPT = [4];
+---
+
+<QueryFlow
+	id="inf"
+	label="IS NULL diagram"
+	title="WHERE caption IS NULL keeps the post with no caption"
+	desc="Post 105 has no caption, so its caption is NULL and it is the only row kept. The other four posts have captions and are left out."
+	input={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: POSTS_ROWS }}
+	keep={KEPT}
+	step="WHERE caption IS NULL"
+	result={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: postsRows(KEPT) }}
+>
+	<QueryNote x={424} y={284} lines={['no caption']} />
+</QueryFlow>

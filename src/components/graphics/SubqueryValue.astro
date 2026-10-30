@@ -1,0 +1,169 @@
+---
+// A subquery that returns one value: the inner query finds asha.codes's id (1), then the outer
+// query keeps the posts whose user_id is 1. Inner query on the left, its answer in the middle,
+// outer query and its result on the right. Handwritten notes follow DESIGN.md (target, arrow,
+// note). Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div
+		class="overflow-x-auto"
+		role="region"
+		aria-label="Subquery with one value diagram"
+		tabindex="0"
+	>
+		<svg
+			viewBox="0 0 720 580"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="sqv-title sqv-desc"
+		>
+			<title id="sqv-title">The inner query answers 1, and the outer query uses it</title>
+			<desc id="sqv-desc">
+				The inner query looks up asha.codes in the users table and returns its id, 1. The outer
+				query then keeps the posts whose user_id is 1: post 101, Sunset at the beach, and post 103,
+				Weekend trek. Posts 102, 104 and 105, by user 2, are skipped. The result is Sunset at the
+				beach and Weekend trek.
+			</desc>
+
+			<SvgTable
+				name="users"
+				x={10}
+				y={40}
+				width={200}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'username', x: 70, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+					['3', 'meera.eats'],
+				]}
+				keyTint={{ x: 16, width: 40 }}
+				linkedRows={[0]}
+			/>
+
+			<!-- The inner query's answer -->
+			<text
+				x="300"
+				y="74"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="13"
+				fill="var(--color-ink-muted)">inner query</text
+			>
+			<rect
+				x="262"
+				y="88"
+				width="76"
+				height="40"
+				rx="10"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"
+				stroke="var(--color-mint)"
+				stroke-width="2"></rect>
+			<text
+				x="300"
+				y="114"
+				text-anchor="middle"
+				font-family="var(--font-sans)"
+				font-size="18"
+				font-weight="600"
+				fill="var(--color-mint)">1</text
+			>
+
+			<SvgTable
+				name="posts"
+				x={380}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'id', x: 424, anchor: 'end' },
+					{ label: 'user_id', x: 494, anchor: 'end', key: true },
+					{ label: 'caption', x: 520, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '2', 'Street tacos'],
+					['105', '2', 'NULL'],
+				]}
+				keyTint={{ x: 434, width: 66 }}
+				linkedRows={[0, 2]}
+			/>
+
+			<!-- users → answer → posts -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M214 108 C 228 104, 242 104, 254 108"></path>
+				<path d="M254 108 l-8.1 -7.5 M254 108 l-9.8 5"></path>
+				<path d="M342 108 C 352 104, 362 104, 372 108"></path>
+				<path d="M372 108 l-8.1 -7.5 M372 108 l-9.8 5"></path>
+			</g>
+
+			<!-- posts → result -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M545 334 C 547 346, 543 362, 545 376"></path>
+				<path d="M545 376 l-6.3 -9 M545 376 l6.3 -9"></path>
+			</g>
+			<text
+				x="561"
+				y="360"
+				font-family="var(--font-mono)"
+				font-size="14"
+				fill="var(--color-ink-muted)"
+				aria-hidden="true">WHERE user_id = 1</text
+			>
+
+			<SvgTable
+				name="result"
+				x={380}
+				y={420}
+				width={330}
+				columns={[{ label: 'caption', x: 400, anchor: 'start' }]}
+				rows={[['Sunset at the beach'], ['Weekend trek']]}
+			/>
+
+			<!-- Annotations: arrows end 12-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M300 176 C 302 164, 298 152, 300 142"></path>
+				<path d="M300 142 l-6.3 9 M300 142 l6.3 9"></path>
+				<path d="M318 270 C 340 262, 356 230, 370 210"></path>
+				<path d="M370 210 l-10.3 3.8 M370 210 l0 11"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="300" y="198" text-anchor="middle">runs first</text>
+				<text x="240" y="292" text-anchor="middle">user_id 1 only</text>
+			</g>
+		</svg>
+	</div>
+</figure>

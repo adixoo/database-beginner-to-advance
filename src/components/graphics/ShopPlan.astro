@@ -1,0 +1,194 @@
+---
+// The online shop's schema: four tables as cards listing their columns, with key columns in
+// mint and tagged PK/FK. Lines join each foreign key to the primary key it points to, marked
+// "1" and "many". A handwritten note points out the junction table (DESIGN.md: target, arrow,
+// note). One SVG; it scrolls sideways when the column is narrower than ~600px.
+
+interface Column {
+	name: string;
+	tag?: string;
+	key?: boolean;
+}
+
+interface Card {
+	name: string;
+	x: number;
+	y: number;
+	width: number;
+	columns: Column[];
+}
+
+const NAME_BASELINE = 28;
+const RULE = 42;
+const ROW_HEIGHT = 28;
+
+const CARDS: Card[] = [
+	{
+		name: 'customers',
+		x: 20,
+		y: 40,
+		width: 200,
+		columns: [
+			{ name: 'id', tag: 'PK', key: true },
+			{ name: 'name' },
+			{ name: 'email', tag: 'UNIQUE' },
+		],
+	},
+	{
+		name: 'orders',
+		x: 300,
+		y: 40,
+		width: 200,
+		columns: [
+			{ name: 'id', tag: 'PK', key: true },
+			{ name: 'customer_id', tag: 'FK', key: true },
+			{ name: 'ordered_on' },
+		],
+	},
+	{
+		name: 'order_items',
+		x: 580,
+		y: 40,
+		width: 220,
+		columns: [
+			{ name: 'order_id', tag: 'PK FK', key: true },
+			{ name: 'product_id', tag: 'PK FK', key: true },
+			{ name: 'quantity' },
+		],
+	},
+	{
+		name: 'products',
+		x: 580,
+		y: 250,
+		width: 220,
+		columns: [{ name: 'id', tag: 'PK', key: true }, { name: 'name' }, { name: 'price_cents' }],
+	},
+];
+
+const cardHeight = (card: Card): number => RULE + card.columns.length * ROW_HEIGHT + 14;
+const rowBaseline = (card: Card, index: number): number =>
+	card.y + RULE + (index + 1) * ROW_HEIGHT - 8;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Online shop schema diagram" tabindex="0">
+		<svg
+			viewBox="0 0 820 410"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="sp-title sp-desc"
+		>
+			<title id="sp-title">The online shop's four tables and how they link</title>
+			<desc id="sp-desc">
+				customers has id (primary key), name and email (unique). orders has id (primary key),
+				customer_id (foreign key to customers) and ordered_on. order_items has order_id and
+				product_id (together the primary key, each a foreign key) and quantity. products has id
+				(primary key), name and price_cents. One customer has many orders, one order has many
+				order_items, and one product appears in many order_items. order_items is the junction table
+				that links orders and products many-to-many.
+			</desc>
+
+			{
+				CARDS.map((card) => (
+					<g font-family="var(--font-sans)">
+						<rect
+							x={card.x}
+							y={card.y}
+							width={card.width}
+							height={cardHeight(card)}
+							rx="14"
+							fill="var(--color-surface)"
+						/>
+						<text
+							x={card.x + 16}
+							y={card.y + NAME_BASELINE}
+							font-size="17"
+							font-weight="700"
+							fill="var(--color-ink)"
+						>
+							{card.name}
+						</text>
+						<line
+							x1={card.x + 16}
+							y1={card.y + RULE}
+							x2={card.x + card.width - 16}
+							y2={card.y + RULE}
+							stroke="var(--color-gray-700)"
+						/>
+						{card.columns.map((column, index) => (
+							<g>
+								<text
+									x={card.x + 16}
+									y={rowBaseline(card, index)}
+									font-size="15"
+									font-weight={column.key ? 600 : 400}
+									fill={column.key ? 'var(--color-mint)' : 'var(--color-ink-soft)'}
+								>
+									{column.name}
+								</text>
+								{column.tag && (
+									<text
+										x={card.x + card.width - 16}
+										y={rowBaseline(card, index)}
+										text-anchor="end"
+										font-family="var(--font-mono)"
+										font-size="12"
+										fill={column.key ? 'var(--color-mint)' : 'var(--color-ink-muted)'}
+									>
+										{column.tag}
+									</text>
+								)}
+							</g>
+						))}
+					</g>
+				))
+			}
+
+			<!-- Relationships: foreign key to primary key, "1" on the primary key side -->
+			<g aria-hidden="true">
+				<g
+					fill="none"
+					stroke="var(--color-ink-muted)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M220 97 C 260 97, 260 125, 300 125"></path>
+					<path d="M500 97 C 528 93, 552 93, 580 97"></path>
+					<path d="M690 250 C 694 230, 686 200, 690 180"></path>
+				</g>
+				<g font-family="var(--font-sans)" font-size="13" fill="var(--color-ink-soft)">
+					<text x="228" y="88">1</text>
+					<text x="292" y="146" text-anchor="end">many</text>
+					<text x="508" y="88">1</text>
+					<text x="572" y="88" text-anchor="end">many</text>
+					<text x="700" y="242">1</text>
+					<text x="700" y="196">many</text>
+				</g>
+			</g>
+
+			<!-- Annotation: arrow ends 14px short of the junction table -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M456 284 C 490 266, 540 216, 568 194"></path>
+				<path d="M568 194 l-11 0.6 M568 194 l-3.2 10.5"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="330" y="300">links orders</text>
+				<text x="330" y="326">and products</text>
+			</g>
+		</svg>
+	</div>
+</figure>

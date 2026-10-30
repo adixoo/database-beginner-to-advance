@@ -1,0 +1,66 @@
+---
+title: Subqueries
+description: A subquery is a query inside another query. The inner query runs first, and the outer query uses its answer.
+level: beginner
+order: 12
+---
+
+import Callout from '@/components/Callout.astro';
+import SubqueryList from '@/components/graphics/SubqueryList.astro';
+import SubqueryValue from '@/components/graphics/SubqueryValue.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A **subquery** is a query inside another query, wrapped in brackets. The inner query runs first, and the outer query uses its answer. We keep using the course database.
+
+## One value
+
+Find the posts by `asha.codes`, without knowing the user's id:
+
+```sql
+SELECT caption
+FROM posts
+WHERE user_id = (
+  SELECT id FROM users WHERE username = 'asha.codes'
+);
+```
+
+<SubqueryValue />
+
+## A list of values
+
+Which users have never posted?
+
+```sql
+SELECT username
+FROM users
+WHERE id NOT IN (SELECT user_id FROM posts);
+```
+
+<SubqueryList />
+
+`IN` keeps the rows whose value is in the list, and `NOT IN` keeps the rest.
+
+<Callout type="warning">
+
+Use `=` only when the inner query returns one value. If it returns several, SQLite quietly uses the first one, and most other databases stop with an error. For example, `WHERE id = (SELECT user_id FROM likes)` returns only `ravi.clicks`, the first user in `likes`. Use `IN` instead.
+
+</Callout>
+
+Stuck? Run the inner query on its own first, and check what it returns.
+
+## Words to know
+
+<WordsToKnow>
+
+- **IN**
+  Keeps rows whose value appears in a list.
+- **Inner query**
+  The query in brackets. It runs first.
+- **NOT IN**
+  Keeps rows whose value does not appear in a list.
+- **Outer query**
+  The main query, which uses the inner query's answer.
+- **Subquery**
+  A query inside another query.
+
+</WordsToKnow>

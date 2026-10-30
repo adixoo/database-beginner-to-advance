@@ -1,0 +1,24 @@
+---
+// NOT NULL turning away a user with no name.
+import {
+	CONSTRAINT_USERS_COLUMNS,
+	CONSTRAINT_USERS_ROWS,
+	CONSTRAINT_USERS_WIDTH,
+} from './constraint-tables';
+import ConstraintCheck from './ConstraintCheck.astro';
+---
+
+<ConstraintCheck
+	id="nnc"
+	label="NOT NULL diagram"
+	title="NOT NULL refuses a user without a name"
+	desc="The users table holds asha.codes, ravi.clicks and meera.eats. An INSERT tries to add nina.paints with no name, so name is NULL. name is NOT NULL, so the row is refused with: NOT NULL constraint failed: users.name."
+	name="users"
+	tableWidth={CONSTRAINT_USERS_WIDTH}
+	columns={CONSTRAINT_USERS_COLUMNS}
+	rows={CONSTRAINT_USERS_ROWS}
+	attempt={['–', 'nina.paints', 'NULL']}
+	badColumn={2}
+	error="NOT NULL constraint failed: users.name"
+	note={['name is', 'required']}
+/>

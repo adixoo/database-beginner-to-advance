@@ -1,0 +1,115 @@
+---
+// First normal form: a tags cell holding a list (rose) is split into post_tags, one tag per row.
+// Handwritten note follows DESIGN.md (target, arrow, note). Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+// Rows whose tags cell holds more than one value
+const LIST_ROWS = [0, 2];
+const ROW_TOP = 88;
+const ROW_HEIGHT = 44;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="First normal form diagram" tabindex="0">
+		<svg
+			viewBox="0 0 630 340"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="nf1-title nf1-desc"
+		>
+			<title id="nf1-title">A list in one cell becomes one row per value</title>
+			<desc id="nf1-desc">
+				Before: posts has a tags column. Post 101 holds beach, sunset; post 102 holds coffee; post
+				103 holds hiking, hills. After: post_tags has one row per tag: 101 beach, 101 sunset, 102
+				coffee, 103 hiking, 103 hills.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={40}
+				width={360}
+				columns={[
+					{ label: 'id', x: 50, anchor: 'end' },
+					{ label: 'caption', x: 74, anchor: 'start' },
+					{ label: 'tags', x: 246, anchor: 'start' },
+				]}
+				rows={[
+					['101', 'Sunset at the beach', 'beach, sunset'],
+					['102', 'First latte art', 'coffee'],
+					['103', 'Weekend trek', 'hiking, hills'],
+				]}
+			/>
+			{
+				LIST_ROWS.map((rowIndex) => (
+					<rect
+						x="236"
+						y={ROW_TOP + rowIndex * ROW_HEIGHT + 4}
+						width="126"
+						height={ROW_HEIGHT - 8}
+						rx="6"
+						fill="var(--color-rose)"
+						fill-opacity="0.14"
+						stroke="var(--color-rose)"
+						stroke-width="2"
+					/>
+				))
+			}
+
+			<!-- Split into its own table -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M380 152 C 396 146, 412 146, 428 152"></path>
+				<path d="M428 152 l-8.1 -7.5 M428 152 l-9.8 5"></path>
+			</g>
+
+			<SvgTable
+				name="post_tags"
+				x={440}
+				y={40}
+				width={180}
+				columns={[
+					{ label: 'post_id', x: 512, anchor: 'end', key: true },
+					{ label: 'tag', x: 536, anchor: 'start' },
+				]}
+				rows={[
+					['101', 'beach'],
+					['101', 'sunset'],
+					['102', 'coffee'],
+					['103', 'hiking'],
+					['103', 'hills'],
+				]}
+				keyTint={{ x: 452, width: 68 }}
+			/>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M300 272 C 302 264, 300 256, 300 250"></path>
+				<path d="M300 250 l-6.3 9 M300 250 l6.3 9"></path>
+			</g>
+			<text
+				x="300"
+				y="296"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">two values in one cell</text
+			>
+		</svg>
+	</div>
+</figure>

@@ -1,0 +1,151 @@
+---
+// A constraint turning a row away: the table as it is, the row an INSERT tried to add or an
+// UPDATE tried to write (rose outline, the offending value in rose), a blocked arrow up to the table, and the exact error.
+// An optional note points at the attempted row. Below ~80% of 640px it scrolls sideways.
+import QueryNote from './QueryNote.astro';
+import SvgTable, { type SvgTableColumn } from './SvgTable.astro';
+
+interface Props {
+	label: string;
+	title: string;
+	desc: string;
+	id: string;
+	name: string;
+	tableWidth: number;
+	columns: SvgTableColumn[];
+	rows: string[][];
+	// The statement that was refused, shown above the attempted row
+	statement?: 'INSERT' | 'UPDATE';
+	// The row the statement tried to write, one value per column
+	attempt: string[];
+	// Column of the value that broke the rule; leave out when the whole row is the problem
+	badColumn?: number;
+	error: string;
+	note?: string[];
+}
+
+const WIDTH = 640;
+const TABLE_X = 10;
+const TABLE_TOP = 40;
+
+const {
+	label,
+	title,
+	desc,
+	id,
+	name,
+	tableWidth,
+	columns,
+	rows,
+	statement = 'INSERT',
+	attempt,
+	badColumn,
+	error,
+	note,
+} = Astro.props;
+const tableBottom = TABLE_TOP + 64 + rows.length * 44;
+const attemptTop = tableBottom + 76;
+const height = attemptTop + 96;
+const arrowX = TABLE_X + tableWidth / 2;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label={label} tabindex="0">
+		<svg
+			viewBox={`0 0 ${WIDTH} ${height}`}
+			class="w-full min-w-[512px]"
+			role="img"
+			aria-labelledby={`${id}-title ${id}-desc`}
+		>
+			<title id={`${id}-title`}>{title}</title>
+			<desc id={`${id}-desc`}>{desc}</desc>
+
+			<SvgTable
+				name={name}
+				x={TABLE_X}
+				y={TABLE_TOP}
+				width={tableWidth}
+				columns={columns}
+				rows={rows}
+			/>
+
+			<g aria-hidden="true">
+				<!-- Blocked: an arrow up from the attempt to the table, crossed out -->
+				<g
+					fill="none"
+					stroke="var(--color-rose)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d={`M${arrowX} ${attemptTop - 8} L${arrowX} ${tableBottom + 12}`}></path>
+					<path d={`M${arrowX} ${tableBottom + 12} l-6.3 9 M${arrowX} ${tableBottom + 12} l6.3 9`}
+					></path>
+				</g>
+				<circle
+					cx={arrowX}
+					cy={tableBottom + 42}
+					r="13"
+					fill="var(--color-canvas)"
+					stroke="var(--color-rose)"
+					stroke-width="2"></circle>
+				<text
+					x={arrowX}
+					y={tableBottom + 48}
+					text-anchor="middle"
+					font-family="var(--font-sans)"
+					font-size="16"
+					font-weight="700"
+					fill="var(--color-rose)">✕</text
+				>
+
+				<text
+					x={TABLE_X + 4}
+					y={attemptTop - 10}
+					font-family="var(--font-mono)"
+					font-size="13"
+					fill="var(--color-ink-muted)">{statement}</text
+				>
+				<rect
+					x={TABLE_X}
+					y={attemptTop}
+					width={tableWidth}
+					height="40"
+					rx="8"
+					fill="var(--color-rose)"
+					fill-opacity="0.1"
+					stroke="var(--color-rose)"
+					stroke-width="2"></rect>
+				<g font-family="var(--font-sans)" font-size="16">
+					{
+						attempt.map((value, columnIndex) => {
+							const column = columns[columnIndex];
+							const isBad = columnIndex === badColumn;
+							return (
+								<text
+									x={column.x}
+									y={attemptTop + 26}
+									text-anchor={column.anchor}
+									font-weight={isBad ? 700 : 400}
+									fill={isBad ? 'var(--color-rose)' : 'var(--color-ink-soft)'}
+								>
+									{value}
+								</text>
+							);
+						})
+					}
+				</g>
+				<text
+					x={TABLE_X}
+					y={attemptTop + 72}
+					font-family="var(--font-mono)"
+					font-size="14"
+					style="font-variant-ligatures: none"
+					fill="var(--color-rose)">Error: {error}</text
+				>
+			</g>
+
+			{note && <QueryNote x={TABLE_X + tableWidth + 14} y={attemptTop + 20} lines={note} />}
+		</svg>
+	</div>
+</figure>

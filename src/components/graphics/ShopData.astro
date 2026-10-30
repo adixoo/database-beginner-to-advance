@@ -1,0 +1,116 @@
+---
+// The online shop's four tables after the INSERTs, key columns in mint. Order 1 and its two
+// lines in order_items are outlined (peach) and a handwritten note reads them out
+// (DESIGN.md: target, arrow, note). One SVG; it scrolls sideways when the column is narrower
+// than ~600px.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Online shop data diagram" tabindex="0">
+		<svg
+			viewBox="0 0 760 610"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="sd-title sd-desc"
+		>
+			<title id="sd-title">The shop's tables after adding customers, products and orders</title>
+			<desc id="sd-desc">
+				customers: 1 Asha, 2 Ravi, 3 Meera, each with an email. products: 1 Mug 450 cents, 2
+				Notebook 300 cents, 3 Pen 120 cents. orders: order 1 by customer 1 on 2026-10-01, order 2 by
+				customer 2 on 2026-10-03, order 3 by customer 1 on 2026-10-05. order_items: order 1 has 2 of
+				product 1 and 1 of product 3; order 2 has 1 of product 2; order 3 has 3 of product 2.
+			</desc>
+
+			<SvgTable
+				name="customers"
+				x={20}
+				y={40}
+				width={340}
+				columns={[
+					{ label: 'id', x: 56, anchor: 'end', key: true },
+					{ label: 'name', x: 80, anchor: 'start' },
+					{ label: 'email', x: 150, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'Asha', 'asha@example.com'],
+					['2', 'Ravi', 'ravi@example.com'],
+					['3', 'Meera', 'meera@example.com'],
+				]}
+			/>
+			<SvgTable
+				name="products"
+				x={400}
+				y={40}
+				width={340}
+				columns={[
+					{ label: 'id', x: 436, anchor: 'end', key: true },
+					{ label: 'name', x: 460, anchor: 'start' },
+					{ label: 'price_cents', x: 720, anchor: 'end' },
+				]}
+				rows={[
+					['1', 'Mug', '450'],
+					['2', 'Notebook', '300'],
+					['3', 'Pen', '120'],
+				]}
+			/>
+			<SvgTable
+				name="orders"
+				x={20}
+				y={300}
+				width={340}
+				columns={[
+					{ label: 'id', x: 56, anchor: 'end', key: true },
+					{ label: 'customer_id', x: 180, anchor: 'end', key: true },
+					{ label: 'ordered_on', x: 204, anchor: 'start' },
+				]}
+				rows={[
+					['1', '1', '2026-10-01'],
+					['2', '2', '2026-10-03'],
+					['3', '1', '2026-10-05'],
+				]}
+				linkedRows={[0]}
+			/>
+			<SvgTable
+				name="order_items"
+				x={400}
+				y={300}
+				width={340}
+				columns={[
+					{ label: 'order_id', x: 484, anchor: 'end', key: true },
+					{ label: 'product_id', x: 604, anchor: 'end', key: true },
+					{ label: 'quantity', x: 716, anchor: 'end' },
+				]}
+				rows={[
+					['1', '1', '2'],
+					['1', '3', '1'],
+					['2', '2', '1'],
+					['3', '2', '3'],
+				]}
+				linkedRows={[0, 1]}
+			/>
+
+			<!-- Annotation: arrow ends 16px short of the table -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M556 574 C 558 568, 554 562, 556 556"></path>
+				<path d="M556 556 l-6.3 9 M556 556 l6.3 9"></path>
+			</g>
+			<text
+				x="470"
+				y="598"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">order 1: 2 mugs and a pen</text
+			>
+		</svg>
+	</div>
+</figure>

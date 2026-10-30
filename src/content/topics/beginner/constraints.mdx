@@ -1,0 +1,95 @@
+---
+title: Constraints
+description: Constraints are rules a column must follow, and the database refuses any row that breaks one.
+level: beginner
+order: 11
+---
+
+import Callout from '@/components/Callout.astro';
+import CheckRule from '@/components/graphics/CheckRule.astro';
+import DefaultValue from '@/components/graphics/DefaultValue.astro';
+import ForeignKeyCheck from '@/components/graphics/ForeignKeyCheck.astro';
+import NotNullCheck from '@/components/graphics/NotNullCheck.astro';
+import UniqueCheck from '@/components/graphics/UniqueCheck.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A **constraint** is a rule a column must follow. The database checks it on every insert and update, and refuses any row that breaks it. Your course tables already have several: `username` is `NOT NULL UNIQUE`, `name` is `NOT NULL`, and `views` has `DEFAULT 0` and a `CHECK`.
+
+Try to break each rule.
+
+## NOT NULL
+
+```sql
+INSERT INTO users (username) VALUES ('nina.paints');
+```
+
+<NotNullCheck />
+
+## UNIQUE
+
+```sql
+INSERT INTO users (username, name) VALUES ('asha.codes', 'Asha');
+```
+
+<UniqueCheck />
+
+## CHECK
+
+`CHECK` runs your own test. The `views` column you added in [Filtering and sorting](/beginner/filtering-and-sorting) came with `CHECK (views >= 0)`, so views can never go below zero:
+
+```sql
+UPDATE posts SET views = -5 WHERE id = 101;
+```
+
+<CheckRule />
+
+## DEFAULT
+
+`DEFAULT` never refuses anything. It fills in a value you leave out:
+
+```sql
+INSERT INTO posts (user_id, caption) VALUES (2, 'Rainy day');
+```
+
+<DefaultValue />
+
+Remove the test post again, so the next topics see the same data:
+
+```sql
+DELETE FROM posts WHERE id = 106;
+```
+
+## Foreign keys
+
+A [foreign key](/beginner/keys#foreign-keys) must point at a row that exists. There is no user 9:
+
+```sql
+PRAGMA foreign_keys = ON;
+
+INSERT INTO posts (user_id, caption) VALUES (9, 'Ghost post');
+```
+
+<ForeignKeyCheck />
+
+<Callout type="warning">
+
+SQLite only checks foreign keys after `PRAGMA foreign_keys = ON`, once per connection. Without it, the ghost post gets in.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **CHECK**
+  A constraint that runs your own test on a value.
+- **Constraint**
+  A rule a column must follow, checked on every insert and update.
+- **DEFAULT**
+  The value a column gets when an insert leaves it out.
+- **NOT NULL**
+  A constraint that makes a column required.
+- **UNIQUE**
+  A constraint that stops two rows having the same value.
+
+</WordsToKnow>

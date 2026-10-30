@@ -1,0 +1,104 @@
+---
+// `posts` and `users` side by side: Asha's two posts both point at Asha's one row in users,
+// while Ravi's single post points at Ravi's row (dimmed). The foreign key lives on the "many" side, in
+// posts.user_id. Handwritten notes follow DESIGN.md (target, arrow, note).
+// One SVG so the arrows stay locked to the rows at any width; below ~500px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="One-to-many diagram" tabindex="0">
+		<svg
+			viewBox="0 0 700 316"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="otm-title otm-desc"
+		>
+			<title id="otm-title">One user has many posts, and each post has one user</title>
+			<desc id="otm-desc">
+				The posts table has three posts. Posts 101 and 103 have user_id 1, so both point to
+				asha.codes in the users table. Post 102 has user_id 2 and points to ravi.clicks. user_id is
+				the foreign key, on the many side.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={20}
+				y={80}
+				width={360}
+				columns={[
+					{ label: 'id', x: 60, anchor: 'end' },
+					{ label: 'user_id', x: 130, anchor: 'end', key: true },
+					{ label: 'caption', x: 156, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+				]}
+				keyTint={{ x: 74, width: 66 }}
+				linkedRows={[0, 2]}
+			/>
+			<SvgTable
+				name="users"
+				x={460}
+				y={80}
+				width={220}
+				columns={[
+					{ label: 'id', x: 500, anchor: 'end', key: true },
+					{ label: 'username', x: 530, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+				]}
+				keyTint={{ x: 466, width: 50 }}
+				linkedRows={[0]}
+			/>
+
+			<!-- The links: two posts to one user, and Ravi's post (dimmed) to Ravi's row -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M384 144 C 408 138, 428 138, 448 142"></path>
+				<path d="M448 142 l-7.6 -8 M448 142 l-10.1 4.4"></path>
+				<path d="M384 236 C 414 234, 428 164, 448 156"></path>
+				<path d="M448 156 l-10.7 -2.5 M448 156 l-6 9.2"></path>
+				<g stroke-opacity="0.4">
+					<path d="M384 192 C 408 188, 428 190, 448 196"></path>
+					<path d="M448 196 l-6.8 -8.6 M448 196 l-10.4 3.4"></path>
+				</g>
+			</g>
+
+			<!-- Annotations: arrows end 16-20px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M420 40 C 424 66, 420 96, 418 120"></path>
+				<path d="M418 120 l7.2 -8.4 M418 120 l-5.4 -9.6"></path>
+				<path d="M144 298 C 124 302, 110 294, 108 286"></path>
+				<path d="M108 286 l-5 9.8 M108 286 l7.5 8.1"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="26"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="420" y="30" text-anchor="middle">two posts, one user</text>
+				<text x="150" y="306">foreign key on the many side</text>
+			</g>
+		</svg>
+	</div>
+</figure>

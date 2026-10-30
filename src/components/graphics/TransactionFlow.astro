@@ -1,0 +1,147 @@
+---
+// A transaction as a row of steps: BEGIN, the two updates, COMMIT (mint). A butter bracket over
+// all of them says they happen together or not at all. The balances before BEGIN and after
+// COMMIT sit underneath; the total stays 600. Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+interface Step {
+	label: string;
+	x: number;
+	width: number;
+	edge?: boolean;
+}
+
+const STEPS: Step[] = [
+	{ label: 'BEGIN', x: 10, width: 80, edge: true },
+	{ label: 'Asha −200', x: 130, width: 160 },
+	{ label: 'Ravi +200', x: 330, width: 160 },
+	{ label: 'COMMIT', x: 530, width: 100, edge: true },
+];
+const STEP_TOP = 60;
+const STEP_HEIGHT = 40;
+
+const COLUMNS = (x: number) => [
+	{ label: 'id', x: x + 36, anchor: 'end' as const },
+	{ label: 'name', x: x + 60, anchor: 'start' as const },
+	{ label: 'balance', x: x + 170, anchor: 'end' as const },
+];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Transaction steps diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 370"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="tf-title tf-desc"
+		>
+			<title id="tf-title">BEGIN, two updates, COMMIT: all or nothing</title>
+			<desc id="tf-desc">
+				The transaction runs BEGIN, takes 200 from Asha, gives 200 to Ravi, then COMMIT. Both
+				updates happen, or neither does. Before: Asha 500, Ravi 100. After COMMIT: Asha 300, Ravi
+				300. The total stays 600.
+			</desc>
+
+			<!-- Steps -->
+			{
+				STEPS.map((step) => (
+					<g aria-hidden="true">
+						<rect
+							x={step.x}
+							y={STEP_TOP}
+							width={step.width}
+							height={STEP_HEIGHT}
+							rx="10"
+							fill={step.edge ? 'var(--color-mint)' : 'var(--color-raised)'}
+							fill-opacity={step.edge ? 0.14 : 1}
+							stroke={step.edge ? 'var(--color-mint)' : 'none'}
+							stroke-width="2"
+						/>
+						<text
+							x={step.x + step.width / 2}
+							y={STEP_TOP + 26}
+							text-anchor="middle"
+							font-family="var(--font-mono)"
+							font-size="14"
+							font-weight={step.edge ? 700 : 400}
+							fill={step.edge ? 'var(--color-mint)' : 'var(--color-ink)'}
+						>
+							{step.label}
+						</text>
+					</g>
+				))
+			}
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M96 80 C 104 78, 114 78, 122 80"></path>
+				<path d="M122 80 l-7.5 -5.5 M122 80 l-8 4.5"></path>
+				<path d="M296 80 C 304 78, 314 78, 322 80"></path>
+				<path d="M322 80 l-7.5 -5.5 M322 80 l-8 4.5"></path>
+				<path d="M496 80 C 504 78, 514 78, 522 80"></path>
+				<path d="M522 80 l-7.5 -5.5 M522 80 l-8 4.5"></path>
+				<path d="M580 108 C 582 122, 578 136, 580 148"></path>
+				<path d="M580 148 l-6.3 -9 M580 148 l6.3 -9"></path>
+			</g>
+
+			<!-- Annotation: the whole transaction is one unit -->
+			<path
+				d="M10 52 L10 44 L630 44 L630 52"
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"></path>
+			<text
+				x="320"
+				y="32"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">both happen, or neither</text
+			>
+
+			<SvgTable
+				name="before"
+				x={10}
+				y={180}
+				width={200}
+				columns={COLUMNS(10)}
+				rows={[
+					['1', 'Asha', '500'],
+					['2', 'Ravi', '100'],
+				]}
+			/>
+			<SvgTable
+				name="after COMMIT"
+				x={430}
+				y={180}
+				width={200}
+				columns={COLUMNS(430)}
+				rows={[
+					['1', 'Asha', '300'],
+					['2', 'Ravi', '300'],
+				]}
+				linkedRows={[0, 1]}
+			/>
+			<g
+				font-family="var(--font-sans)"
+				font-size="15"
+				text-anchor="middle"
+				fill="var(--color-ink-muted)"
+				aria-hidden="true"
+			>
+				<text x="110" y="358">total 600</text>
+				<text x="530" y="358">total 600</text>
+			</g>
+		</svg>
+	</div>
+</figure>

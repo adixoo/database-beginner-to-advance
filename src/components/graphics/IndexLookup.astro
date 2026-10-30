@@ -1,0 +1,110 @@
+---
+// An index lookup: idx_posts_user_id keeps user_id values sorted, each pointing at its post. To
+// find user 1's posts, the database jumps to the 1s at the top of the index (peach) and follows
+// their pointers (mint) straight to rows 101 and 103. Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Index lookup diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 420"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="il-title il-desc"
+		>
+			<title id="il-title">With an index, the database jumps straight to the matching rows</title>
+			<desc id="il-desc">
+				The index idx_posts_user_id lists user_id values in order, each with the post it belongs to:
+				1 101, 1 103, 2 102, 2 104, 2 105. To answer WHERE user_id = 1, the database reads the first
+				two entries and goes straight to posts 101 and 103.
+			</desc>
+
+			<text
+				x="10"
+				y="22"
+				font-family="var(--font-mono)"
+				font-size="14"
+				fill="var(--color-ink-muted)">WHERE user_id = 1</text
+			>
+
+			<SvgTable
+				name="idx_posts_user_id"
+				x={10}
+				y={70}
+				width={200}
+				columns={[
+					{ label: 'user_id', x: 80, anchor: 'end', key: true },
+					{ label: 'post', x: 160, anchor: 'end' },
+				]}
+				rows={[
+					['1', '101'],
+					['1', '103'],
+					['2', '102'],
+					['2', '104'],
+					['2', '105'],
+				]}
+				keyTint={{ x: 24, width: 66 }}
+				linkedRows={[0, 1]}
+			/>
+			<SvgTable
+				name="posts"
+				x={300}
+				y={70}
+				width={330}
+				columns={[
+					{ label: 'id', x: 344, anchor: 'end' },
+					{ label: 'user_id', x: 414, anchor: 'end', key: true },
+					{ label: 'caption', x: 440, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '2', 'Street tacos'],
+					['105', '2', 'NULL'],
+				]}
+				keyTint={{ x: 358, width: 66 }}
+				linkedRows={[0, 2]}
+			/>
+
+			<!-- The jumps: each index entry for user 1 to its post -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M214 138 C 240 132, 266 132, 290 136"></path>
+				<path d="M290 136 l-8.1 -7.5 M290 136 l-9.8 5"></path>
+				<path d="M214 182 C 246 184, 262 218, 290 224"></path>
+				<path d="M290 224 l-7.5 -8.1 M290 224 l-10.2 4.3"></path>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M110 386 C 112 380, 109 374, 110 370"></path>
+				<path d="M110 370 l-6.3 9 M110 370 l6.3 9"></path>
+			</g>
+			<text
+				x="110"
+				y="406"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">sorted by user_id</text
+			>
+		</svg>
+	</div>
+</figure>

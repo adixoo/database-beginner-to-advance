@@ -1,0 +1,164 @@
+---
+// SQL injection side by side. Top (rose): input glued into the SQL text becomes part of the
+// query and returns every user. Bottom (mint): the same input sent as a placeholder value is
+// just text and matches nobody. The ✗ / ✓ glyphs carry the meaning as well as the colour.
+// One SVG; it scrolls sideways when the column is narrower than ~600px.
+
+// JetBrains Mono at 15px advances 9px per character
+const CHAR = 9;
+const CODE_X = 44;
+// Where the typed text starts inside the glued SQL: after "SELECT … username = '"
+const INJECTED_START = 38;
+const INJECTED = "' OR '1'='1";
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="SQL injection diagram" tabindex="0">
+		<svg
+			viewBox="0 0 720 428"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="inj-title inj-desc"
+		>
+			<title id="inj-title">Glued-in input becomes SQL; a placeholder keeps it as plain text</title>
+			<desc id="inj-desc">
+				Someone types ' OR '1'='1 as a username. Glued into the SQL text, the query becomes SELECT *
+				FROM users WHERE username = '' OR '1'='1', which is true for every row, so it returns all
+				three users. Sent as a placeholder value instead, the query stays SELECT * FROM users WHERE
+				username = ?, the input is only compared as text, and no rows come back.
+			</desc>
+
+			<!-- Glued in -->
+			<rect
+				x="20"
+				y="20"
+				width="680"
+				height="188"
+				rx="20"
+				fill="var(--color-rose)"
+				fill-opacity="0.08"></rect>
+			<text
+				x="44"
+				y="56"
+				font-family="var(--font-sans)"
+				font-size="17"
+				font-weight="700"
+				fill="var(--color-rose)">✗ Glued into the SQL text</text
+			>
+			<text x="44" y="94" font-family="var(--font-sans)" font-size="15" fill="var(--color-ink-soft)"
+				>Someone types:</text
+			>
+			<rect
+				x="166"
+				y="77"
+				width={INJECTED.length * CHAR + 16}
+				height="24"
+				rx="6"
+				fill="var(--color-rose)"
+				fill-opacity="0.16"></rect>
+			<text x="174" y="94" font-family="var(--font-mono)" font-size="15" fill="var(--color-rose)"
+				>{INJECTED}</text
+			>
+			<rect
+				x={CODE_X + INJECTED_START * CHAR - 3}
+				y="118"
+				width={INJECTED.length * CHAR + 6}
+				height="24"
+				rx="6"
+				fill="var(--color-rose)"
+				fill-opacity="0.16"></rect>
+			<text x={CODE_X} y="135" font-family="var(--font-mono)" font-size="15" fill="var(--color-ink)"
+				><tspan fill="var(--color-lilac)">SELECT</tspan> * <tspan fill="var(--color-lilac)"
+					>FROM</tspan
+				> users <tspan fill="var(--color-lilac)">WHERE</tspan> username = '<tspan
+					fill="var(--color-rose)">{INJECTED}</tspan
+				>'</text
+			>
+			<text
+				x="44"
+				y="182"
+				font-family="var(--font-sans)"
+				font-size="15"
+				font-weight="600"
+				fill="var(--color-rose)">→ returns every user: asha.codes, ravi.clicks, meera.eats</text
+			>
+
+			<!-- Placeholder -->
+			<rect
+				x="20"
+				y="224"
+				width="680"
+				height="188"
+				rx="20"
+				fill="var(--color-mint)"
+				fill-opacity="0.08"></rect>
+			<text
+				x="44"
+				y="260"
+				font-family="var(--font-sans)"
+				font-size="17"
+				font-weight="700"
+				fill="var(--color-mint)">✓ With a placeholder</text
+			>
+			<text x={CODE_X} y="300" font-family="var(--font-mono)" font-size="15" fill="var(--color-ink)"
+				><tspan fill="var(--color-lilac)">SELECT</tspan> * <tspan fill="var(--color-lilac)"
+					>FROM</tspan
+				> users <tspan fill="var(--color-lilac)">WHERE</tspan> username = <tspan
+					fill="var(--color-mint)">?</tspan
+				></text
+			>
+			<text
+				x="44"
+				y="342"
+				font-family="var(--font-sans)"
+				font-size="15"
+				fill="var(--color-ink-soft)">Value, sent apart:</text
+			>
+			<rect
+				x="182"
+				y="325"
+				width={INJECTED.length * CHAR + 16}
+				height="24"
+				rx="6"
+				fill="var(--color-mint)"
+				fill-opacity="0.16"></rect>
+			<text x="190" y="342" font-family="var(--font-mono)" font-size="15" fill="var(--color-mint)"
+				>{INJECTED}</text
+			>
+			<text
+				x="44"
+				y="386"
+				font-family="var(--font-sans)"
+				font-size="15"
+				font-weight="600"
+				fill="var(--color-mint)">→ 0 rows: no user is called that</text
+			>
+
+			<!-- Annotations: arrows end 12-14px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M520 80 C 500 78, 482 92, 470 108"></path>
+				<path d="M470 108 l10.5 -3.4 M470 108 l0.4 -11"></path>
+				<path d="M432 340 C 420 334, 344 336, 316 338"></path>
+				<path d="M316 338 l9.4 5.7 M316 338 l8.5 -6.9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="526" y="76">now part of</text>
+				<text x="526" y="100">the query</text>
+				<text x="440" y="348">just text, never run</text>
+			</g>
+		</svg>
+	</div>
+</figure>

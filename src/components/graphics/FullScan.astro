@@ -1,0 +1,75 @@
+---
+// A full table scan: to find user 1's posts without an index, the database reads every row of
+// posts from top to bottom (butter arrow) and keeps the two that match (peach). Below ~500px
+// it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Full table scan diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 380"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="fs-title fs-desc"
+		>
+			<title id="fs-title">Without an index, the database checks every row</title>
+			<desc id="fs-desc">
+				To answer WHERE user_id = 1, the database reads all 5 posts, 101 to 105, one by one. Only
+				posts 101 and 103 have user_id 1.
+			</desc>
+
+			<text
+				x="60"
+				y="22"
+				font-family="var(--font-mono)"
+				font-size="14"
+				fill="var(--color-ink-muted)">WHERE user_id = 1</text
+			>
+
+			<SvgTable
+				name="posts"
+				x={60}
+				y={70}
+				width={370}
+				columns={[
+					{ label: 'id', x: 104, anchor: 'end' },
+					{ label: 'user_id', x: 174, anchor: 'end', key: true },
+					{ label: 'caption', x: 200, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '2', 'Street tacos'],
+					['105', '2', 'NULL'],
+				]}
+				keyTint={{ x: 118, width: 66 }}
+				linkedRows={[0, 2]}
+			/>
+
+			<!-- Annotation: the scan runs down every row -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M450 122 C 456 190, 444 260, 450 330"></path>
+				<path d="M450 330 l-6.3 -9 M450 330 l6.3 -9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="472" y="226">checks every</text>
+				<text x="472" y="250">row: 5 of 5</text>
+			</g>
+		</svg>
+	</div>
+</figure>

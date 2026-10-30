@@ -1,0 +1,136 @@
+---
+// Second normal form: likes_flat is identified by user_id + post_id together (mint), but its
+// username depends on user_id alone, so it repeats (rose). It moves to users, leaving likes with
+// just the key. Handwritten note follows DESIGN.md (target, arrow, note). Below ~600px it scrolls
+// sideways.
+import SvgTable from './SvgTable.astro';
+
+// Rows where ravi.clicks is repeated
+const REPEATED_ROWS = [0, 3];
+const ROW_TOP = 88;
+const ROW_HEIGHT = 44;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Second normal form diagram" tabindex="0">
+		<svg
+			viewBox="0 0 760 340"
+			class="w-full min-w-[600px]"
+			role="img"
+			aria-labelledby="nf2-title nf2-desc"
+		>
+			<title id="nf2-title">A column that depends on half the key moves out</title>
+			<desc id="nf2-desc">
+				Before: likes_flat has user_id, post_id and username, with user_id and post_id together as
+				the key. Rows: 2, 101, ravi.clicks; 3, 101, meera.eats; 1, 102, asha.codes; 2, 103,
+				ravi.clicks. username depends only on user_id, so ravi.clicks repeats. After: likes keeps
+				only user_id and post_id, and users holds each username once: 1 asha.codes, 2 ravi.clicks, 3
+				meera.eats.
+			</desc>
+
+			<SvgTable
+				name="likes_flat"
+				x={10}
+				y={40}
+				width={290}
+				columns={[
+					{ label: 'user_id', x: 80, anchor: 'end', key: true },
+					{ label: 'post_id', x: 150, anchor: 'end', key: true },
+					{ label: 'username', x: 176, anchor: 'start' },
+				]}
+				rows={[
+					['2', '101', 'ravi.clicks'],
+					['3', '101', 'meera.eats'],
+					['1', '102', 'asha.codes'],
+					['2', '103', 'ravi.clicks'],
+				]}
+				keyTint={{ x: 24, width: 136 }}
+			/>
+			{
+				REPEATED_ROWS.map((rowIndex) => (
+					<rect
+						x="166"
+						y={ROW_TOP + rowIndex * ROW_HEIGHT + 4}
+						width="102"
+						height={ROW_HEIGHT - 8}
+						rx="6"
+						fill="var(--color-rose)"
+						fill-opacity="0.14"
+						stroke="var(--color-rose)"
+						stroke-width="2"
+					/>
+				))
+			}
+
+			<!-- Split into two tables -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M312 152 C 330 146, 350 146, 366 152"></path>
+				<path d="M366 152 l-8.1 -7.5 M366 152 l-9.8 5"></path>
+			</g>
+
+			<SvgTable
+				name="likes"
+				x={380}
+				y={40}
+				width={160}
+				columns={[
+					{ label: 'user_id', x: 450, anchor: 'end', key: true },
+					{ label: 'post_id', x: 520, anchor: 'end', key: true },
+				]}
+				rows={[
+					['2', '101'],
+					['3', '101'],
+					['1', '102'],
+					['2', '103'],
+				]}
+				keyTint={{ x: 394, width: 136 }}
+			/>
+			<SvgTable
+				name="users"
+				x={570}
+				y={40}
+				width={180}
+				columns={[
+					{ label: 'id', x: 606, anchor: 'end', key: true },
+					{ label: 'username', x: 630, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+					['3', 'meera.eats'],
+				]}
+				keyTint={{ x: 576, width: 40 }}
+			/>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M220 310 C 222 304, 219 298, 220 294"></path>
+				<path d="M220 294 l-6.3 9 M220 294 l6.3 9"></path>
+			</g>
+			<text
+				x="220"
+				y="332"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">needs only user_id</text
+			>
+		</svg>
+	</div>
+</figure>

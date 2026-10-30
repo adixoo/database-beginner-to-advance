@@ -1,0 +1,81 @@
+---
+title: Counting and grouping
+description: Aggregate functions like COUNT and SUM turn many rows into one number, and GROUP BY does it once per group.
+level: beginner
+order: 10
+---
+
+import Callout from '@/components/Callout.astro';
+import AggregateRow from '@/components/graphics/AggregateRow.astro';
+import GroupByUser from '@/components/graphics/GroupByUser.astro';
+import HavingFilter from '@/components/graphics/HavingFilter.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+An **aggregate function** turns many rows into one value, like a total or an average. Your `posts` table is ready: it has the `views` column and five posts from [Filtering and sorting](/beginner/filtering-and-sorting).
+
+## COUNT, SUM, AVG, MIN and MAX
+
+```sql
+SELECT COUNT(*), SUM(views), AVG(views), MIN(views), MAX(views)
+FROM posts;
+```
+
+<AggregateRow />
+
+`COUNT(*)` counts rows. The others add up, average, or pick the smallest and biggest value of a column.
+
+<Callout type="info">
+
+`COUNT(caption)` gives 4, not 5: counting a column skips its `NULL` values.
+
+</Callout>
+
+## GROUP BY
+
+To get one answer per user instead of one for the whole table, group the rows first:
+
+```sql
+SELECT user_id, COUNT(*) AS posts, SUM(views) AS total_views
+FROM posts
+GROUP BY user_id;
+```
+
+<GroupByUser />
+
+`AS` gives a result column a name. Meera has no posts, so there is no group for user 3.
+
+## HAVING
+
+`HAVING` filters the groups, the way `WHERE` filters rows:
+
+```sql
+SELECT user_id, COUNT(*) AS posts, SUM(views) AS total_views
+FROM posts
+GROUP BY user_id
+HAVING total_views > 50;
+```
+
+<HavingFilter />
+
+<Callout type="info">
+
+`WHERE` runs before grouping and picks rows. `HAVING` runs after grouping and picks groups.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Aggregate function**
+  A function that turns many rows into one value, such as SUM.
+- **AS**
+  Gives a result column a name of your choice.
+- **COUNT**
+  Counts rows, or the values in a column that are not NULL.
+- **GROUP BY**
+  Splits rows into groups and gives one result row per group.
+- **HAVING**
+  Keeps only the groups that pass a test.
+
+</WordsToKnow>

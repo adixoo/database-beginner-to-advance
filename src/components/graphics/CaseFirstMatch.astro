@@ -1,0 +1,181 @@
+---
+// How CASE picks a label with several WHENs: each row is checked against the WHENs from left to
+// right and stops at the first one that is true (mint check). Later checks are skipped (dash);
+// failed ones get a rose cross; a row where nothing is true falls through to ELSE. Handwritten
+// notes follow DESIGN.md (target, arrow, note). Below ~500px it scrolls sideways.
+
+type Check = 'yes' | 'no' | 'skip';
+
+interface Row {
+	caption: string;
+	views: string;
+	checks: [Check, Check];
+	label: string;
+}
+
+const ROWS: Row[] = [
+	{ caption: 'Sunset at the beach', views: '42', checks: ['yes', 'skip'], label: 'popular' },
+	{ caption: 'First latte art', views: '7', checks: ['no', 'no'], label: 'quiet' },
+	{ caption: 'Weekend trek', views: '15', checks: ['no', 'yes'], label: 'growing' },
+	{ caption: 'Street tacos', views: '23', checks: ['no', 'yes'], label: 'growing' },
+	{ caption: 'NULL', views: '3', checks: ['no', 'no'], label: 'quiet' },
+];
+
+const FRAME = { x: 10, y: 40, width: 540, height: 284 };
+const HEADER_BASELINE = 72;
+const ROWS_TOP = 88;
+const ROW_HEIGHT = 44;
+// Centres of the two WHEN columns
+const CHECK_X = [290, 390];
+
+const rowCentre = (index: number): number => ROWS_TOP + index * ROW_HEIGHT + 20;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="CASE first match diagram" tabindex="0">
+		<svg
+			viewBox="0 0 720 400"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="cfm-title cfm-desc"
+		>
+			<title id="cfm-title">CASE stops at the first WHEN that is true</title>
+			<desc id="cfm-desc">
+				Sunset at the beach has 42 views, which is 40 or more, so it is popular and the second check
+				is skipped. Weekend trek (15) and Street tacos (23) are not 40 or more, but are 10 or more,
+				so they are growing. First latte art (7) and the post with no caption (3) fail both checks,
+				so ELSE makes them quiet.
+			</desc>
+
+			<rect
+				x={FRAME.x}
+				y={FRAME.y}
+				width={FRAME.width}
+				height={FRAME.height}
+				rx="14"
+				fill="var(--color-surface)"></rect>
+
+			<!-- The WHEN that decided each row -->
+			{
+				ROWS.map((row, rowIndex) =>
+					row.checks.map(
+						(check, checkIndex) =>
+							check === 'yes' && (
+								<rect
+									x={CHECK_X[checkIndex] - 20}
+									y={rowCentre(rowIndex) - 18}
+									width="40"
+									height="36"
+									rx="8"
+									fill="var(--color-mint)"
+									fill-opacity="0.16"
+								/>
+							),
+					),
+				)
+			}
+
+			<line
+				x1={FRAME.x + 16}
+				y1={ROWS_TOP}
+				x2={FRAME.x + FRAME.width - 16}
+				y2={ROWS_TOP}
+				stroke="var(--color-gray-700)"></line>
+
+			<!-- Header -->
+			<g font-family="var(--font-sans)" font-size="15" fill="var(--color-ink-muted)">
+				<text x="30" y={HEADER_BASELINE}>caption</text>
+				<text x="232" y={HEADER_BASELINE} text-anchor="end">views</text>
+				<text x="440" y={HEADER_BASELINE}>label</text>
+			</g>
+			<g
+				font-family="var(--font-mono)"
+				font-size="13"
+				fill="var(--color-ink-muted)"
+				text-anchor="middle"
+				style="font-variant-ligatures: none"
+			>
+				<text x={CHECK_X[0]} y={HEADER_BASELINE}>&gt;= 40</text>
+				<text x={CHECK_X[1]} y={HEADER_BASELINE}>&gt;= 10</text>
+			</g>
+
+			<!-- Rows -->
+			{
+				ROWS.map((row, rowIndex) => {
+					const centre = rowCentre(rowIndex);
+					const baseline = centre + 8;
+					const fellThrough = row.checks.every((check) => check === 'no');
+					return (
+						<g>
+							<g font-family="var(--font-sans)" font-size="16" fill="var(--color-ink-soft)">
+								<text x="30" y={baseline}>
+									{row.caption}
+								</text>
+								<text x="232" y={baseline} text-anchor="end">
+									{row.views}
+								</text>
+								<text
+									x="440"
+									y={baseline}
+									font-weight={fellThrough ? 400 : 600}
+									fill={fellThrough ? 'var(--color-ink-soft)' : 'var(--color-ink)'}
+								>
+									{row.label}
+								</text>
+							</g>
+							<g
+								fill="none"
+								stroke-width="3"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								{row.checks.map((check, checkIndex) => {
+									const x = CHECK_X[checkIndex];
+									if (check === 'yes')
+										return (
+											<path d={`M${x - 7} ${centre} l5 6 l10 -12`} stroke="var(--color-mint)" />
+										);
+									if (check === 'no')
+										return (
+											<path
+												d={`M${x - 6} ${centre - 6} l12 12 M${x + 6} ${centre - 6} l-12 12`}
+												stroke="var(--color-rose)"
+											/>
+										);
+									return <path d={`M${x - 6} ${centre} l12 0`} stroke="var(--color-gray-600)" />;
+								})}
+							</g>
+						</g>
+					);
+				})
+			}
+
+			<!-- Annotations: arrows end 12-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M390 356 C 392 350, 388 346, 390 340"></path>
+				<path d="M390 340 l-6.3 9 M390 340 l6.3 9"></path>
+				<path d="M576 146 C 556 140, 520 144, 496 150"></path>
+				<path d="M496 150 l10.3 4 M496 150 l7.3 -8.3"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="390" y="376" text-anchor="middle">stops at the first match</text>
+				<text x="584" y="150">nothing true,</text>
+				<text x="584" y="174">so ELSE</text>
+			</g>
+		</svg>
+	</div>
+</figure>

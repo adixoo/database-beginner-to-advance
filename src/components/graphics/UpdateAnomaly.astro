@@ -1,0 +1,88 @@
+---
+// The update anomaly: posts_flat copies each author's username into every post. After renaming
+// user 1 in only one row, the same user has two usernames (rose cells). Handwritten note follows
+// DESIGN.md (target, arrow, note). Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+// Rows whose username now disagrees (row index); cell box for the username column
+const CLASHING_ROWS = [0, 2];
+const ROW_TOP = 88;
+const ROW_HEIGHT = 44;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Update anomaly diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 250"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="ua-title ua-desc"
+		>
+			<title id="ua-title">The same user ends up with two usernames</title>
+			<desc id="ua-desc">
+				posts_flat stores the author's username in every post. Post 101 by user 1 now says asha.art,
+				post 102 by user 2 says ravi.clicks, and post 103 by user 1 still says asha.codes. User 1
+				has two different usernames.
+			</desc>
+
+			<SvgTable
+				name="posts_flat"
+				x={10}
+				y={40}
+				width={470}
+				columns={[
+					{ label: 'post_id', x: 80, anchor: 'end' },
+					{ label: 'caption', x: 104, anchor: 'start' },
+					{ label: 'user_id', x: 330, anchor: 'end', key: true },
+					{ label: 'username', x: 356, anchor: 'start' },
+				]}
+				rows={[
+					['101', 'Sunset at the beach', '1', 'asha.art'],
+					['102', 'First latte art', '2', 'ravi.clicks'],
+					['103', 'Weekend trek', '1', 'asha.codes'],
+				]}
+				keyTint={{ x: 274, width: 66 }}
+			/>
+			{
+				CLASHING_ROWS.map((rowIndex) => (
+					<rect
+						x="346"
+						y={ROW_TOP + rowIndex * ROW_HEIGHT + 4}
+						width="126"
+						height={ROW_HEIGHT - 8}
+						rx="6"
+						fill="var(--color-rose)"
+						fill-opacity="0.14"
+						stroke="var(--color-rose)"
+						stroke-width="2"
+					/>
+				))
+			}
+
+			<!-- Annotation: one note, an arrow to each clashing cell -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M502 136 C 498 124, 494 112, 488 108"></path>
+				<path d="M488 108 l4 10.2 M488 108 l11 -0.2"></path>
+				<path d="M502 184 C 498 192, 494 196, 488 196"></path>
+				<path d="M488 196 l9 6.3 M488 196 l9 -6.3"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="508" y="158">same user,</text>
+				<text x="508" y="182">two names</text>
+			</g>
+		</svg>
+	</div>
+</figure>

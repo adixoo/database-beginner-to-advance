@@ -1,0 +1,78 @@
+---
+title: Combining results
+description: UNION, INTERSECT and EXCEPT put the rows of two queries together into one result.
+level: beginner
+order: 14
+---
+
+import Callout from '@/components/Callout.astro';
+import SetOperations from '@/components/graphics/SetOperations.astro';
+import UnionStack from '@/components/graphics/UnionStack.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+`UNION`, `INTERSECT` and `EXCEPT` combine the results of two queries into one. We use the course database and two lists of user ids: who posted, and who liked post 101.
+
+```sql
+SELECT user_id FROM posts;
+SELECT user_id FROM likes WHERE post_id = 101;
+```
+
+The first returns `1, 2, 1, 2, 2` and the second `2, 3`. User 1 is `asha.codes`, 2 is `ravi.clicks` and 3 is `meera.eats`.
+
+## UNION and UNION ALL
+
+```sql
+SELECT user_id FROM posts
+UNION ALL
+SELECT user_id FROM likes WHERE post_id = 101;
+```
+
+```sql
+SELECT user_id FROM posts
+UNION
+SELECT user_id FROM likes WHERE post_id = 101;
+```
+
+<UnionStack />
+
+`UNION ALL` keeps every row. `UNION` drops the repeats.
+
+## INTERSECT and EXCEPT
+
+```sql
+SELECT user_id FROM posts
+INTERSECT
+SELECT user_id FROM likes WHERE post_id = 101;
+```
+
+```sql
+SELECT user_id FROM posts
+EXCEPT
+SELECT user_id FROM likes WHERE post_id = 101;
+```
+
+<SetOperations />
+
+- `INTERSECT` keeps rows in both results: only `ravi.clicks` posted and liked post 101.
+- `EXCEPT` keeps rows in the first result but not the second. Swap the two queries and you get `3` instead of `1`.
+
+<Callout type="warning">
+
+Both queries must return the same number of columns. If they don't, SQLite stops with: `SELECTs to the left and right of UNION do not have the same number of result columns`.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **EXCEPT**
+  Rows in the first result that are not in the second.
+- **INTERSECT**
+  Rows that are in both results.
+- **UNION**
+  All rows from both results, without repeats.
+- **UNION ALL**
+  All rows from both results, repeats included.
+
+</WordsToKnow>

@@ -1,0 +1,97 @@
+---
+// `users` and `user_settings` side by side, each user linked to exactly one settings row.
+// user_settings.user_id is both the primary key and the foreign key, so a second row for the
+// same user is impossible. Handwritten notes follow DESIGN.md (target, arrow, note).
+// One SVG so the arrows stay locked to the rows at any width; below ~500px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="One-to-one diagram" tabindex="0">
+		<svg
+			viewBox="0 0 700 290"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="oto-title oto-desc"
+		>
+			<title id="oto-title">Each user has exactly one row in user_settings</title>
+			<desc id="oto-desc">
+				The users table has ids 1 and 2. The user_settings table has one row for user_id 1 and one
+				for user_id 2, with a dark_mode value each. Each user links to exactly one settings row.
+				user_id is both the primary key and the foreign key of user_settings.
+			</desc>
+
+			<SvgTable
+				name="users"
+				x={20}
+				y={60}
+				width={260}
+				columns={[
+					{ label: 'id', x: 60, anchor: 'end', key: true },
+					{ label: 'username', x: 86, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+				]}
+				keyTint={{ x: 26, width: 50 }}
+			/>
+			<SvgTable
+				name="user_settings"
+				x={420}
+				y={60}
+				width={260}
+				columns={[
+					{ label: 'user_id', x: 490, anchor: 'end', key: true },
+					{ label: 'dark_mode', x: 516, anchor: 'start' },
+				]}
+				rows={[
+					['1', '1'],
+					['2', '0'],
+				]}
+				keyTint={{ x: 430, width: 66 }}
+			/>
+
+			<!-- The links: one per user, each to its own settings row -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M284 128 C 320 124, 380 124, 408 128"></path>
+				<path d="M408 128 l-8.1 -7.5 M408 128 l-9.8 5"></path>
+				<path d="M284 172 C 320 168, 380 168, 408 172"></path>
+				<path d="M408 172 l-8.1 -7.5 M408 172 l-9.8 5"></path>
+			</g>
+
+			<!-- Annotations: arrows end 14-18px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M350 234 C 352 220, 348 204, 350 190"></path>
+				<path d="M350 190 l-6.3 9 M350 190 l6.3 9"></path>
+				<path d="M494 244 C 474 248, 464 240, 463 224"></path>
+				<path d="M463 224 l-5 9.8 M463 224 l7.5 8.1"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="26"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="350" y="258" text-anchor="middle">one user, one row</text>
+				<text x="500" y="252">primary key</text>
+				<text x="500" y="278">and foreign key</text>
+			</g>
+		</svg>
+	</div>
+</figure>

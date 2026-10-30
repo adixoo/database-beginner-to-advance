@@ -1,0 +1,69 @@
+---
+title: Indexes
+description: An index lets the database jump straight to the rows you ask for, instead of checking every row in the table.
+level: beginner
+order: 16
+---
+
+import Callout from '@/components/Callout.astro';
+import FullScan from '@/components/graphics/FullScan.astro';
+import IndexLookup from '@/components/graphics/IndexLookup.astro';
+import QueryPlanChange from '@/components/graphics/QueryPlanChange.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+An **index** is a sorted list the database can jump into, like the index at the back of a book.
+
+## Without an index: check every row
+
+<FullScan />
+
+To find Asha's posts, the database reads all 5 rows. With millions of posts, that gets slow.
+
+## With an index: jump to the rows
+
+<IndexLookup />
+
+The index keeps `user_id` values in order, each pointing at its row. The database jumps to the 1s and follows the pointers.
+
+## See the difference
+
+In your course database, ask SQLite how it plans to run the query, add the index, then ask again:
+
+```sql
+EXPLAIN QUERY PLAN SELECT * FROM posts WHERE user_id = 1;
+
+CREATE INDEX idx_posts_user_id ON posts (user_id);
+
+EXPLAIN QUERY PLAN SELECT * FROM posts WHERE user_id = 1;
+```
+
+<QueryPlanChange />
+
+`SCAN` reads every row. `SEARCH ... USING INDEX` jumps straight to the matches.
+
+<Callout type="info">
+
+Primary keys and `UNIQUE` columns get an index automatically.
+
+</Callout>
+
+<Callout type="warning">
+
+Indexes are not free: each one takes space and must be updated on every `INSERT`, `UPDATE` and `DELETE`. Index the columns you search by often, not all of them.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **EXPLAIN QUERY PLAN**
+  Asks SQLite how it will run a query, without running it.
+- **Full table scan**
+  Reading every row of a table to find the matches.
+- **Index**
+  A sorted list of a column's values that points to their rows.
+- **Query plan**
+  The steps the database chooses to answer a query.
+
+</WordsToKnow>

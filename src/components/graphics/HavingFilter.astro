@@ -1,0 +1,30 @@
+---
+// HAVING total_views > 50: the per-user groups that pass stay (peach); user 2's group, with
+// only 33 views, is dimmed and left out.
+import QueryFlow from './QueryFlow.astro';
+import QueryNote from './QueryNote.astro';
+
+const COLUMNS = [
+	{ label: 'user_id', x: 80, anchor: 'end' as const, key: true },
+	{ label: 'posts', x: 150, anchor: 'end' as const },
+	{ label: 'total_views', x: 270, anchor: 'end' as const },
+];
+const GROUPS = [
+	['1', '2', '57'],
+	['2', '3', '33'],
+];
+---
+
+<QueryFlow
+	id="hf"
+	label="HAVING diagram"
+	title="HAVING total_views > 50 keeps the groups with more than 50 views"
+	desc="After GROUP BY there is one row per user: user 1 with 57 views and user 2 with 33. HAVING total_views > 50 keeps user 1 and leaves out user 2."
+	input={{ name: 'groups', width: 290, columns: COLUMNS, rows: GROUPS }}
+	keep={[0]}
+	step="HAVING total_views > 50"
+	result={{ width: 290, columns: COLUMNS, rows: [GROUPS[0]] }}
+	width={520}
+>
+	<QueryNote x={314} y={152} lines={['only 33 views,', 'group dropped']} />
+</QueryFlow>

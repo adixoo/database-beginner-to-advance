@@ -1,0 +1,19 @@
+---
+// ORDER BY views DESC LIMIT 3: the three most-viewed posts, biggest first.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH, postsRows } from './query-posts-data';
+import QueryNote from './QueryNote.astro';
+import QueryFlow from './QueryFlow.astro';
+---
+
+<QueryFlow
+	id="ol"
+	label="ORDER BY and LIMIT diagram"
+	title="ORDER BY views DESC LIMIT 3 keeps the three most-viewed posts, biggest first"
+	desc="Sorted by views, biggest first, the posts are 101 (42), 104 (23), 103 (15), 102 (7) and 105 (3). LIMIT 3 keeps the first three: 101, 104 and 103."
+	input={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: POSTS_ROWS }}
+	keep={[0, 2, 3]}
+	step="ORDER BY views DESC LIMIT 3"
+	result={{ width: POSTS_WIDTH, columns: POSTS_COLUMNS, rows: postsRows([0, 3, 2]) }}
+>
+	<QueryNote x={424} y={520} lines={['most views first,', 'only 3 rows']} />
+</QueryFlow>

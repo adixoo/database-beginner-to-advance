@@ -1,0 +1,145 @@
+---
+// How LEFT JOIN builds its result: every user is kept. Users with posts are matched to them
+// (mint arrows); meera.eats has none but stays in (peach), and the result fills the missing
+// caption with NULL. Handwritten notes follow DESIGN.md (target, arrow, note). One SVG so the
+// arrows stay locked to the rows at any width; below ~460px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="LEFT JOIN diagram" tabindex="0">
+		<svg
+			viewBox="0 0 600 550"
+			class="w-full min-w-[460px]"
+			role="img"
+			aria-labelledby="lj-title lj-desc"
+		>
+			<title id="lj-title">LEFT JOIN keeps every user, with or without posts</title>
+			<desc id="lj-desc">
+				asha.codes matches posts 101 and 103. ravi.clicks matches post 102. meera.eats has no posts
+				but is still kept. The result has four rows: asha.codes with Sunset at the beach, asha.codes
+				with Weekend trek, ravi.clicks with First latte art, and meera.eats with NULL, because there
+				is no caption to show.
+			</desc>
+
+			<SvgTable
+				name="users"
+				x={10}
+				y={40}
+				width={170}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'username', x: 70, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+					['3', 'meera.eats'],
+				]}
+				keyTint={{ x: 16, width: 40 }}
+				linkedRows={[2]}
+			/>
+			<SvgTable
+				name="posts"
+				x={260}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'id', x: 304, anchor: 'end' },
+					{ label: 'user_id', x: 374, anchor: 'end', key: true },
+					{ label: 'caption', x: 400, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+				]}
+				keyTint={{ x: 314, width: 66 }}
+			/>
+
+			<!-- The matches: each user's id to the posts with that user_id -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M184 108 C 208 102, 230 102, 252 106"></path>
+				<path d="M252 106 l-8.1 -7.5 M252 106 l-9.8 5"></path>
+				<path d="M184 112 C 216 114, 226 182, 252 192"></path>
+				<path d="M252 192 l-6.7 -8.7 M252 192 l-10.5 3.3"></path>
+				<path d="M184 152 C 208 146, 230 146, 252 150"></path>
+				<path d="M252 150 l-8.1 -7.5 M252 150 l-9.8 5"></path>
+			</g>
+
+			<!-- From the two tables down to the result -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M390 244 C 392 252, 388 258, 390 266"></path>
+				<path d="M390 266 l-6.3 -9 M390 266 l6.3 -9"></path>
+			</g>
+			<text
+				x="376"
+				y="262"
+				text-anchor="end"
+				font-family="var(--font-mono)"
+				font-size="14"
+				fill="var(--color-ink-muted)"
+				aria-hidden="true">ON p.user_id = u.id</text
+			>
+
+			<SvgTable
+				name="result"
+				x={190}
+				y={296}
+				width={400}
+				columns={[
+					{ label: 'username', x: 210, anchor: 'start' },
+					{ label: 'caption', x: 360, anchor: 'start' },
+				]}
+				rows={[
+					['asha.codes', 'Sunset at the beach'],
+					['asha.codes', 'Weekend trek'],
+					['ravi.clicks', 'First latte art'],
+					['meera.eats', 'NULL'],
+				]}
+				linkedRows={[3]}
+			/>
+
+			<!-- Annotations: arrows end 12-16px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M85 258 C 87 248, 85 240, 84 234"></path>
+				<path d="M84 234 l-6.3 9 M84 234 l6.3 9"></path>
+				<path d="M156 494 C 164 490, 170 494, 178 498"></path>
+				<path d="M178 498 l-5.2 -9.6 M178 498 l-10.8 1.6"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="85" y="280" text-anchor="middle">no posts,</text>
+				<text x="85" y="304" text-anchor="middle">still kept</text>
+				<text x="150" y="488" text-anchor="end">no post,</text>
+				<text x="150" y="512" text-anchor="end">so NULL</text>
+			</g>
+		</svg>
+	</div>
+</figure>

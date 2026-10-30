@@ -1,0 +1,32 @@
+---
+// Every code example from a level's topics, grouped under each topic's title, which links back
+// to the topic. Read from the topics' source, so new examples show up here on their own.
+import type { ComponentProps } from 'astro/types';
+import type { Level } from '../config/site';
+import { getTopics, topicCodeSnippets, topicHref, topicSlug } from '../lib/topics';
+import CodeBlock from './CodeBlock.astro';
+
+type CodeLang = ComponentProps<typeof CodeBlock>['lang'];
+
+interface Props {
+	level: Level;
+}
+
+const { level } = Astro.props;
+const groups = (await getTopics(level))
+	.map((topic) => ({ topic, snippets: topicCodeSnippets(topic) }))
+	.filter(({ snippets }) => snippets.length > 0);
+---
+
+{
+	groups.map(({ topic, snippets }) => (
+		<Fragment>
+			<h2 id={topicSlug(topic)}>
+				<a href={topicHref(topic)}>{topic.data.title}</a>
+			</h2>
+			{snippets.map((snippet) => (
+				<CodeBlock code={snippet.code} lang={snippet.lang as CodeLang} />
+			))}
+		</Fragment>
+	))
+}

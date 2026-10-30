@@ -1,0 +1,126 @@
+---
+// A table with one extra column per condition, ticking the rows each condition matches: a row
+// is in the result where its column has a tick. Ticks are mint, misses a muted dash, so the
+// shape of the glyph carries the meaning as well as the colour. Below ~80% of `width` it
+// scrolls sideways in its frame.
+import SvgTable, { type SvgTableColumn } from './SvgTable.astro';
+
+interface Check {
+	// Two header lines: the column, then the test, e.g. ['views', '> 20']
+	header: [string, string];
+	// Centre of the column
+	x: number;
+	values: boolean[];
+}
+
+interface Props {
+	label: string;
+	title: string;
+	desc: string;
+	id: string;
+	name?: string;
+	columns: SvgTableColumn[];
+	rows: string[][];
+	checks: Check[];
+	// Table width; the SVG is 20 wider
+	tableWidth: number;
+	// x of a divider drawn before the last checks, e.g. to set AND/OR apart
+	dividerX?: number;
+}
+
+const TABLE_X = 10;
+const TABLE_TOP = 40;
+
+const {
+	label,
+	title,
+	desc,
+	id,
+	name = 'posts',
+	columns,
+	rows,
+	checks,
+	tableWidth,
+	dividerX,
+} = Astro.props;
+const width = tableWidth + 20;
+const tableHeight = 64 + rows.length * 44;
+const height = TABLE_TOP + tableHeight + 20;
+const rowBaseline = (index: number): number => TABLE_TOP + 48 + index * 44 + 28;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label={label} tabindex="0">
+		<svg
+			viewBox={`0 0 ${width} ${height}`}
+			class="w-full"
+			style={`min-width: ${Math.round(width * 0.8)}px`}
+			role="img"
+			aria-labelledby={`${id}-title ${id}-desc`}
+		>
+			<title id={`${id}-title`}>{title}</title>
+			<desc id={`${id}-desc`}>{desc}</desc>
+
+			<SvgTable
+				name={name}
+				x={TABLE_X}
+				y={TABLE_TOP}
+				width={tableWidth}
+				columns={columns}
+				rows={rows}
+			/>
+
+			<g aria-hidden="true">
+				{
+					dividerX !== undefined && (
+						<line
+							x1={dividerX}
+							y1={TABLE_TOP + 14}
+							x2={dividerX}
+							y2={TABLE_TOP + tableHeight - 14}
+							stroke="var(--color-gray-700)"
+							stroke-width="2"
+						/>
+					)
+				}
+				{
+					checks.map((check) => (
+						<g text-anchor="middle">
+							<text
+								x={check.x}
+								y={TABLE_TOP + 20}
+								font-family="var(--font-sans)"
+								font-size="12"
+								fill="var(--color-ink-muted)"
+							>
+								{check.header[0]}
+							</text>
+							<text
+								x={check.x}
+								y={TABLE_TOP + 38}
+								font-family="var(--font-mono)"
+								font-size="13"
+								font-weight="600"
+								fill="var(--color-ink)"
+							>
+								{check.header[1]}
+							</text>
+							{check.values.map((isMatch, rowIndex) => (
+								<text
+									x={check.x}
+									y={rowBaseline(rowIndex)}
+									font-family="var(--font-sans)"
+									font-size={isMatch ? 20 : 16}
+									font-weight="700"
+									fill={isMatch ? 'var(--color-mint)' : 'var(--color-gray-600)'}
+								>
+									{isMatch ? '✓' : '–'}
+								</text>
+							))}
+						</g>
+					))
+				}
+			</g>
+		</svg>
+	</div>
+</figure>

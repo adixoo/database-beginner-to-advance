@@ -5,149 +5,63 @@ level: beginner
 order: 3
 ---
 
-import Tag from '@/components/Tag.astro';
 import WordsToKnow from '@/components/WordsToKnow.astro';
 
-Let's build a tiny Instagram: a database with a table for users and a table for their posts. We will use **SQLite**, because the whole database is a single file and there is no server to set up. The SQL you write here works almost the same in PostgreSQL and MySQL.
+Let's build a tiny Instagram: a database with a table for users and a table for their posts. We will use **SQLite**, because the whole database is a single file and there is no server to set up.
 
 ## Plan your schema
 
-Before writing any SQL, plan your schema: decide what you need to store. Think in things, not screens: each kind of thing becomes a table, and each detail about it becomes a column.
+The **schema** is the plan for your tables. Each kind of thing becomes a table, and each detail about it becomes a column:
 
-- A **user** has a username and a name.
-- A **post** has a caption, and it belongs to one user.
+| Table | Column   | Type    | Rule                       |
+| ----- | -------- | ------- | -------------------------- |
+| users | id       | INTEGER | Primary key                |
+| users | username | TEXT    | Required, no duplicates    |
+| users | name     | TEXT    | Required                   |
+| posts | id       | INTEGER | Primary key                |
+| posts | user_id  | INTEGER | Required, points to a user |
+| posts | caption  | TEXT    | Optional                   |
 
-Every table also gets an `id` column, so each row can be found by a number that never repeats.
+`INTEGER` holds whole numbers like `42`, and `TEXT` holds words like `'asha.codes'`; [Data types](/beginner/data-types) covers the rest. Every table gets an `id`, so each row has a number that never repeats.
 
-### Tools to draw your schema
-
-Sketching your tables as boxes and lines makes mistakes easy to spot before you build anything. Pen and paper works, and so do these tools:
-
-| Tool                                                                             | Price                | Good for                                              |
-| -------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------- |
-| [ChartDB](https://chartdb.io)                                                    | <Tag>Free</Tag>      | Drawing a schema, or importing one from your database |
-| [drawDB](https://www.drawdb.app)                                                 | <Tag>Free</Tag>      | Drag-and-drop editor in the browser, no account       |
-| [DBeaver Community](https://dbeaver.io/download/)                                | <Tag>Free</Tag>      | A database app that draws diagrams of your tables     |
-| [MySQL Workbench](https://www.mysql.com/products/workbench/)                     | <Tag>Free</Tag>      | The official designer for MySQL                       |
-| [dbdiagram.io](https://dbdiagram.io)                                             | <Tag>Free plan</Tag> | Typing your schema as text and getting a diagram      |
-| [DrawSQL](https://drawsql.app)                                                   | <Tag>Free plan</Tag> | Polished diagrams; free for public ones               |
-| [DbSchema](https://dbschema.com)                                                 | <Tag>Free plan</Tag> | A desktop designer for many databases                 |
-| [Lucidchart](https://www.lucidchart.com)                                         | <Tag>Free plan</Tag> | A general diagram app with database shapes            |
-| [Redgate Data Modeler](https://vertabelo.com)                                    | <Tag>Paid</Tag>      | Team data modelling; formerly called Vertabelo        |
-| [Navicat Data Modeler](https://www.navicat.com/en/products/navicat-data-modeler) | <Tag>Paid</Tag>      | A desktop modeller; it also has a free Lite edition   |
-
-Start with ChartDB or drawDB: both are free, open source and run in your browser.
-
-### Let AI draft your schema
-
-An AI assistant can turn a plain description of your app into a first schema in seconds. All three of these have a free plan:
-
-| Assistant                           | Price                | Made by   |
-| ----------------------------------- | -------------------- | --------- |
-| [ChatGPT](https://chatgpt.com)      | <Tag>Free plan</Tag> | OpenAI    |
-| [Claude](https://claude.ai)         | <Tag>Free plan</Tag> | Anthropic |
-| [Gemini](https://gemini.google.com) | <Tag>Free plan</Tag> | Google    |
-
-Copy this prompt, then change the first line to describe your own app:
-
-```text
-I am building a simplified Instagram where users write posts and like posts.
-Design a database schema for SQLite. I am a beginner, so keep it simple.
-
-For each table, list every column with its data type and its rules
-(primary key, NOT NULL, UNIQUE, foreign key).
-Explain each relationship between tables in one sentence.
-Then give me the CREATE TABLE statements.
-```
-
-AI makes mistakes, so treat its answer as a draft: check every table against your plan, and ask it "why?" about anything you do not understand. Once the schema makes sense to you, paste the SQL into a diagram tool above to see it drawn.
-
-## Design the schema
-
-The **schema** is the plan for your tables: the columns, the type of data each one holds, and the rules it must follow. Here is ours:
-
-| Table | Column     | Type    | Rule                       |
-| ----- | ---------- | ------- | -------------------------- |
-| users | id         | INTEGER | Primary key                |
-| users | username   | TEXT    | Required, no duplicates    |
-| users | name       | TEXT    | Required                   |
-| users | created_at | TEXT    | Filled in automatically    |
-| posts | id         | INTEGER | Primary key                |
-| posts | user_id    | INTEGER | Required, points to a user |
-| posts | caption    | TEXT    | Optional                   |
-| posts | created_at | TEXT    | Filled in automatically    |
-
-The three data types you need to start:
-
-| Type    | Holds                 | Example        |
-| ------- | --------------------- | -------------- |
-| INTEGER | Whole numbers         | `42`           |
-| TEXT    | Words and sentences   | `'asha.codes'` |
-| REAL    | Numbers with decimals | `4.5`          |
+To see your tables drawn as a diagram, use the [Sequill schema visualizer](https://sequill.adibitz.com/vis), or pen and paper.
 
 ## Create the database
 
-[Download SQLite](https://www.sqlite.org/download.html) if you do not have it; it comes pre-installed on macOS and most Linux systems. Then open a terminal and run:
+You can follow along with any [DBMS](/beginner/what-is-a-database#what-is-a-dbms) and editor you like. In this course we use [Sequill](https://sequill.adibitz.com/app), a free SQLite editor made specially for this course: it runs in your browser, so there is nothing to install.
+
+Use this one database for the whole course: every example builds on the ones before, so run them in order.
+
+Prefer the terminal? [Download SQLite](https://www.sqlite.org/download.html), then run:
 
 ```bash
 sqlite3 instagram.db
 ```
 
-This opens the SQLite shell for a database called `instagram.db`. The file is created on disk as soon as you add your first table. Everything you type at the `sqlite>` prompt runs against this database.
-
-In PostgreSQL or MySQL, a server holds many databases, so you create one by name instead: `CREATE DATABASE instagram;`
-
 ## Create the tables
 
-Now turn the schema into SQL. `CREATE TABLE` takes the table name, then each column with its type and rules:
+`CREATE TABLE` takes the table name, then each column with its type and rules:
 
 ```sql
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  name TEXT NOT NULL
 );
 
 CREATE TABLE posts (
   id INTEGER PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users (id),
-  caption TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  caption TEXT
 );
 ```
 
-Each rule maps straight to the schema table:
-
-- `PRIMARY KEY` makes `id` the unique number for each row. In SQLite it fills itself in when you add a row.
+- `PRIMARY KEY` gives each row its own number, filled in for you.
 - `NOT NULL` means the column is required.
 - `UNIQUE` stops two users from having the same username.
-- `DEFAULT CURRENT_TIMESTAMP` fills in the date and time automatically.
-- `REFERENCES users (id)` makes `user_id` a **foreign key**: every post must point to a user that exists.
+- `REFERENCES users (id)` makes `user_id` a **foreign key**: every post points to a user.
 
-SQLite only enforces foreign keys when you switch them on, once per connection:
-
-```sql
-PRAGMA foreign_keys = ON;
-```
-
-## Check your tables
-
-SQLite has shortcut commands that start with a dot. `.tables` lists your tables, and `.schema` shows how one was created:
-
-```text
-sqlite> .tables
-posts  users
-sqlite> .schema posts
-CREATE TABLE posts (
-  id INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users (id),
-  caption TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-If both tables are listed, your database is ready. Type `.quit` to leave the shell; the data stays in `instagram.db`.
+That's it: your database has two tables and is ready for data. Next, [add and read rows](/beginner/working-with-a-database).
 
 ## Words to know
 
@@ -155,19 +69,13 @@ If both tables are listed, your database is ready. Type `.quit` to leave the she
 
 - **Constraint**
   A rule a column must follow, such as NOT NULL or UNIQUE.
-- **CREATE TABLE**
-  The SQL command that builds a new table from your schema.
 - **Data type**
-  The kind of value a column holds: INTEGER, TEXT or REAL.
+  The kind of value a column holds, such as INTEGER or TEXT.
 - **Foreign key**
   A column that points to a row in another table.
-- **NOT NULL**
-  A rule that makes a column required.
 - **Primary key**
   The column whose value is unique for every row.
 - **Schema**
   The plan for your tables: columns, types and rules.
-- **UNIQUE**
-  A rule that stops two rows having the same value.
 
 </WordsToKnow>

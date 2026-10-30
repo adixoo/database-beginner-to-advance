@@ -1,0 +1,72 @@
+---
+// The course database as it stands at the Joins topic: users, posts and likes with every row
+// the earlier topics added, before any join runs. Plain tables, no highlights. Users and posts sit on top,
+// likes below, so the text stays readable in the content column; below ~460px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Instagram data diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 492"
+			class="w-full min-w-[460px]"
+			role="img"
+			aria-labelledby="igd-title igd-desc"
+		>
+			<title id="igd-title">The users, posts and likes tables so far</title>
+			<desc id="igd-desc">
+				users: id 1 asha.codes Asha, id 2 ravi.clicks Ravi, id 3 meera.eats Meera. posts: id 101 by
+				user 1, Sunset at the beach; id 102 by user 2, First latte art; id 103 by user 1, Weekend
+				trek. likes: user 2 likes post 101, user 3 likes post 101, user 1 likes post 102.
+			</desc>
+
+			<SvgTable
+				name="users"
+				x={10}
+				y={40}
+				width={240}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end' },
+					{ label: 'username', x: 70, anchor: 'start' },
+					{ label: 'name', x: 176, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes', 'Asha'],
+					['2', 'ravi.clicks', 'Ravi'],
+					['3', 'meera.eats', 'Meera'],
+				]}
+			/>
+			<SvgTable
+				name="posts"
+				x={270}
+				y={40}
+				width={360}
+				columns={[
+					{ label: 'id', x: 314, anchor: 'end' },
+					{ label: 'user_id', x: 384, anchor: 'end' },
+					{ label: 'caption', x: 410, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+				]}
+			/>
+			<SvgTable
+				name="likes"
+				x={10}
+				y={286}
+				width={200}
+				columns={[
+					{ label: 'user_id', x: 80, anchor: 'end' },
+					{ label: 'post_id', x: 160, anchor: 'end' },
+				]}
+				rows={[
+					['2', '101'],
+					['3', '101'],
+					['1', '102'],
+				]}
+			/>
+		</svg>
+	</div>
+</figure>

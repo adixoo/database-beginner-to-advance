@@ -1,0 +1,24 @@
+---
+// A foreign key turning away a post that points at a user who doesn't exist.
+import {
+	CONSTRAINT_POSTS_COLUMNS,
+	CONSTRAINT_POSTS_ROWS,
+	CONSTRAINT_POSTS_WIDTH,
+} from './constraint-tables';
+import ConstraintCheck from './ConstraintCheck.astro';
+---
+
+<ConstraintCheck
+	id="fkc"
+	label="Foreign key diagram"
+	title="A foreign key refuses a post for a user who does not exist"
+	desc="The posts table holds posts 101 to 105. An INSERT tries to add Ghost post with user_id 9, but the users table only has users 1, 2 and 3. user_id references users (id), so the row is refused with: FOREIGN KEY constraint failed."
+	name="posts"
+	tableWidth={CONSTRAINT_POSTS_WIDTH}
+	columns={CONSTRAINT_POSTS_COLUMNS}
+	rows={CONSTRAINT_POSTS_ROWS}
+	attempt={['–', '9', 'Ghost post', '0']}
+	badColumn={1}
+	error="FOREIGN KEY constraint failed"
+	note={['no user 9']}
+/>

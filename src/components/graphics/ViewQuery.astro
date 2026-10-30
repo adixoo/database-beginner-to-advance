@@ -1,0 +1,175 @@
+---
+// A view is a saved query: posts and users feed the query stored in `post_authors`, and
+// reading the view runs that query to build the rows fresh. Handwritten notes follow DESIGN.md
+// (target, arrow, note). One SVG so the arrows stay locked in place; it scrolls sideways when
+// the column is narrower than ~520px.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="View diagram" tabindex="0">
+		<svg
+			viewBox="0 0 740 890"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="vq-title vq-desc"
+		>
+			<title id="vq-title">The post_authors view stores a query, not rows</title>
+			<desc id="vq-desc">
+				The posts and users tables feed into the view post_authors. The view holds only its query:
+				SELECT posts.caption, users.username FROM posts JOIN users ON posts.user_id = users.id.
+				Running SELECT * FROM post_authors runs that query and builds the result fresh: Sunset at
+				the beach by asha.codes, First latte art by ravi.clicks, Weekend trek by asha.codes, Street
+				tacos by ravi.clicks, and a post with no caption (NULL) by ravi.clicks.
+			</desc>
+
+			<SvgTable
+				name="posts"
+				x={20}
+				y={40}
+				width={330}
+				columns={[
+					{ label: 'id', x: 64, anchor: 'end' },
+					{ label: 'user_id', x: 134, anchor: 'end', key: true },
+					{ label: 'caption', x: 160, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+					['104', '2', 'Street tacos'],
+					['105', '2', 'NULL'],
+				]}
+				keyTint={{ x: 74, width: 66 }}
+			/>
+			<SvgTable
+				name="users"
+				x={440}
+				y={40}
+				width={180}
+				columns={[
+					{ label: 'id', x: 476, anchor: 'end', key: true },
+					{ label: 'username', x: 500, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+					['3', 'meera.eats'],
+				]}
+				keyTint={{ x: 446, width: 40 }}
+			/>
+
+			<!-- Both tables feed the view's query -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M185 334 C 186 350, 196 366, 214 380"></path>
+				<path d="M214 380 l-3.2 -10.5 M214 380 l-11 -0.6"></path>
+				<path d="M530 246 C 528 300, 504 350, 470 380"></path>
+				<path d="M470 380 l10.9 -1.2 M470 380 l2.6 -10.7"></path>
+			</g>
+
+			<!-- The view: a name and its saved query -->
+			<rect
+				x="150"
+				y="388"
+				width="340"
+				height="120"
+				rx="14"
+				fill="var(--color-surface)"
+				stroke="var(--color-lilac)"
+				stroke-width="2"></rect>
+			<text
+				x="170"
+				y="418"
+				font-family="var(--font-sans)"
+				font-size="17"
+				font-weight="700"
+				fill="var(--color-ink)"
+				>post_authors <tspan font-weight="400" fill="var(--color-ink-muted)">(view)</tspan></text
+			>
+			<g font-family="var(--font-mono)" font-size="13" fill="var(--color-ink)">
+				<text x="170" y="448"
+					><tspan fill="var(--color-lilac)">SELECT</tspan> posts.caption, users.username</text
+				>
+				<text x="170" y="470"><tspan fill="var(--color-lilac)">FROM</tspan> posts</text>
+				<text x="170" y="492"
+					><tspan fill="var(--color-lilac)">JOIN</tspan> users <tspan fill="var(--color-lilac)"
+						>ON</tspan
+					> posts.user_id = users.id</text
+				>
+			</g>
+
+			<!-- Reading the view runs the query -->
+			<g aria-hidden="true">
+				<g
+					fill="none"
+					stroke="var(--color-ink-muted)"
+					stroke-width="3"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M320 516 C 322 528, 318 540, 320 554"></path>
+					<path d="M320 554 l5 -9.8 M320 554 l-7.5 -8"></path>
+				</g>
+				<text
+					x="336"
+					y="540"
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink-muted)">SELECT * FROM post_authors</text
+				>
+			</g>
+
+			<SvgTable
+				name="result"
+				x={150}
+				y={588}
+				width={340}
+				columns={[
+					{ label: 'caption', x: 170, anchor: 'start' },
+					{ label: 'username', x: 350, anchor: 'start' },
+				]}
+				rows={[
+					['Sunset at the beach', 'asha.codes'],
+					['First latte art', 'ravi.clicks'],
+					['Weekend trek', 'asha.codes'],
+					['Street tacos', 'ravi.clicks'],
+					['NULL', 'ravi.clicks'],
+				]}
+			/>
+
+			<!-- Annotations: arrows end 14px short of their targets -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M548 440 C 540 430, 520 436, 504 446"></path>
+				<path d="M504 446 l11 0.6 M504 446 l4.3 -10.1"></path>
+				<path d="M560 658 C 552 648, 522 656, 504 670"></path>
+				<path d="M504 670 l11 -0.6 M504 670 l3.2 -10.5"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="556" y="460">stores only</text>
+				<text x="556" y="484">the query</text>
+				<text x="568" y="682">rows built fresh</text>
+				<text x="568" y="706">each time</text>
+			</g>
+		</svg>
+	</div>
+</figure>

@@ -1,0 +1,38 @@
+---
+// COUNT, SUM, AVG, MIN and MAX over the posts: the views column (mint) collapses into one row.
+import { POSTS_COLUMNS, POSTS_ROWS, POSTS_WIDTH } from './query-posts-data';
+import QueryFlow from './QueryFlow.astro';
+import QueryNote from './QueryNote.astro';
+
+const COLUMNS = POSTS_COLUMNS.map((column) =>
+	column.label === 'views' ? { ...column, key: true } : column,
+);
+---
+
+<QueryFlow
+	id="agg"
+	label="Aggregate functions diagram"
+	title="Aggregate functions turn five posts into one row"
+	desc="The five posts have 42, 7, 15, 23 and 3 views. COUNT(*) is 5 rows, SUM(views) is 90, AVG(views) is 18.0, MIN(views) is 3 and MAX(views) is 42, all in a single result row."
+	input={{
+		width: POSTS_WIDTH,
+		columns: COLUMNS,
+		rows: POSTS_ROWS,
+		keyTint: { x: 336, width: 54 },
+	}}
+	step="COUNT(*), SUM(views), AVG(views), MIN(views), MAX(views)"
+	result={{
+		width: 520,
+		columns: [
+			{ label: 'COUNT(*)', x: 96, anchor: 'end' },
+			{ label: 'SUM(views)', x: 196, anchor: 'end', key: true },
+			{ label: 'AVG(views)', x: 296, anchor: 'end', key: true },
+			{ label: 'MIN(views)', x: 396, anchor: 'end', key: true },
+			{ label: 'MAX(views)', x: 496, anchor: 'end', key: true },
+		],
+		rows: [['5', '90', '18.0', '3', '42']],
+	}}
+	width={660}
+>
+	<QueryNote x={544} y={476} lines={['5 rows', 'become 1']} />
+</QueryFlow>

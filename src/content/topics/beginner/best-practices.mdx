@@ -1,0 +1,122 @@
+---
+title: Best practices
+description: Twenty habits that keep a database correct, safe and fast, each with what to do, what to avoid and where to learn it.
+level: beginner
+order: 21
+---
+
+import PracticeCards from '@/components/PracticeCards.astro';
+
+Everything from the beginner topics, boiled down to habits. Each card says what to do, what to avoid, and which topic explains it.
+
+## Design your tables
+
+<PracticeCards>
+
+- **Give every table a primary key**
+  - Do: `id INTEGER PRIMARY KEY` on every table
+  - Don't: rows you can't tell apart
+  - [Keys](/beginner/keys)
+- **Use a surrogate id, keep real data unique**
+  - Do: `id` as the key, `username UNIQUE`
+  - Don't: a username or email as the primary key
+  - [Natural vs surrogate keys](/beginner/keys#natural-vs-surrogate-keys)
+- **Link tables with foreign keys**
+  - Do: `user_id INTEGER REFERENCES users (id)`
+  - Don't: ids that point at rows that don't exist
+  - [Foreign keys](/beginner/keys#foreign-keys)
+- **Pick the right data type**
+  - Do: `INTEGER` for counts, cents for money, `'2026-10-30'` for dates
+  - Don't: numbers or dates stored as free text
+  - [Data types](/beginner/data-types)
+- **Write your rules into the table**
+  - Do: `NOT NULL`, `UNIQUE`, `CHECK (views >= 0)`
+  - Don't: trust every app to check the data
+  - [Constraints](/beginner/constraints)
+- **Store each fact once**
+  - Do: a username lives only in `users`
+  - Don't: copy the same name into many rows
+  - [Normalization](/beginner/normalization)
+- **Use a junction table for many-to-many**
+  - Do: `likes (user_id, post_id)`
+  - Don't: a list of ids in one cell
+  - [Table relationships](/beginner/table-relationships#many-to-many)
+- **Name things clearly and consistently**
+  - Do: `snake_case`, plural tables, `user_id` for a link to `users`
+  - Don't: `tbl1`, `Data`, `uid2`
+  - [Create your first database](/beginner/create-your-first-database)
+
+</PracticeCards>
+
+## Write queries
+
+<PracticeCards>
+
+- **Write the WHERE first**
+  - Do: run a `SELECT` with the same `WHERE` before `UPDATE` or `DELETE`
+  - Don't: `DELETE FROM posts;` by accident
+  - [Working with a database](/beginner/working-with-a-database)
+- **Name the columns you need**
+  - Do: `SELECT caption, views`
+  - Don't: `SELECT *` in app code
+  - [Filtering and sorting](/beginner/filtering-and-sorting)
+- **Check for NULL with IS NULL**
+  - Do: `WHERE caption IS NULL`
+  - Don't: `WHERE caption = NULL` (never matches)
+  - [Data types](/beginner/data-types#null-no-value)
+- **Say the order you want**
+  - Do: `ORDER BY views DESC`
+  - Don't: rely on rows coming back in any order
+  - [Filtering and sorting](/beginner/filtering-and-sorting)
+- **Fetch only what you show**
+  - Do: `LIMIT 10` for a page of results
+  - Don't: load the whole table to show ten rows
+  - [Filtering and sorting](/beginner/filtering-and-sorting)
+
+</PracticeCards>
+
+## Keep data safe
+
+<PracticeCards>
+
+- **Always use placeholders**
+  - Do: `WHERE username = ?` with the value passed separately
+  - Don't: glue user input into the SQL text
+  - [Using a database from your app](/beginner/using-a-database-from-your-app)
+- **Group related changes in a transaction**
+  - Do: `BEGIN` … `COMMIT` for a money transfer
+  - Don't: two separate updates that can half-finish
+  - [Transactions](/beginner/transactions)
+- **Never store plain passwords**
+  - Do: store a hash made with bcrypt or Argon2
+  - Don't: a `password` column anyone can read
+- **Back up before risky changes**
+  - Do: `.backup backup.db` in the SQLite shell, or copy the file while nothing writes
+  - Don't: try a big change on your only copy
+
+</PracticeCards>
+
+## Keep it fast
+
+<PracticeCards>
+
+- **Index the columns you search and join on**
+  - Do: `CREATE INDEX idx_posts_user_id ON posts (user_id)`
+  - Don't: index every column (each one slows writes)
+  - [Indexes](/beginner/indexes)
+- **Check slow queries before guessing**
+  - Do: `EXPLAIN QUERY PLAN` and look for `SCAN`
+  - Don't: add indexes at random
+  - [Indexes](/beginner/indexes)
+
+</PracticeCards>
+
+## Good habits
+
+<PracticeCards>
+
+- **Keep schema changes in files**
+  - Do: numbered `.sql` files, saved in Git
+  - Don't: change tables by hand and forget what you did
+
+</PracticeCards>

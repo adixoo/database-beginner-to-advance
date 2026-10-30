@@ -1,0 +1,133 @@
+---
+// Third normal form: in posts_flat, username is decided by user_id (not by the post), so it is
+// split out into users, and posts keeps only user_id (mint links). Handwritten notes follow
+// DESIGN.md (target, arrow, note). Below ~500px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Third normal form diagram" tabindex="0">
+		<svg
+			viewBox="0 0 620 556"
+			class="w-full min-w-[500px]"
+			role="img"
+			aria-labelledby="nf3-title nf3-desc"
+		>
+			<title id="nf3-title">A column decided by another column moves to its own table</title>
+			<desc id="nf3-desc">
+				Before: posts_flat has post_id, caption, user_id and username; username depends on user_id,
+				not on the post. After: posts has id, user_id and caption (101 by user 1, 102 by user 2, 103
+				by user 1), and users has id and username (1 asha.codes, 2 ravi.clicks). Each username is
+				stored once.
+			</desc>
+
+			<SvgTable
+				name="posts_flat"
+				x={10}
+				y={70}
+				width={470}
+				columns={[
+					{ label: 'post_id', x: 80, anchor: 'end' },
+					{ label: 'caption', x: 104, anchor: 'start' },
+					{ label: 'user_id', x: 330, anchor: 'end', key: true },
+					{ label: 'username', x: 356, anchor: 'start' },
+				]}
+				rows={[
+					['101', 'Sunset at the beach', '1', 'asha.codes'],
+					['102', 'First latte art', '2', 'ravi.clicks'],
+					['103', 'Weekend trek', '1', 'asha.codes'],
+				]}
+				keyTint={{ x: 274, width: 66 }}
+			/>
+
+			<!-- Split into two tables -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M310 276 C 312 286, 308 296, 310 306"></path>
+				<path d="M310 306 l-6.3 -9 M310 306 l6.3 -9"></path>
+			</g>
+
+			<SvgTable
+				name="posts"
+				x={10}
+				y={340}
+				width={330}
+				columns={[
+					{ label: 'id', x: 54, anchor: 'end' },
+					{ label: 'user_id', x: 124, anchor: 'end', key: true },
+					{ label: 'caption', x: 150, anchor: 'start' },
+				]}
+				rows={[
+					['101', '1', 'Sunset at the beach'],
+					['102', '2', 'First latte art'],
+					['103', '1', 'Weekend trek'],
+				]}
+				keyTint={{ x: 64, width: 66 }}
+			/>
+			<SvgTable
+				name="users"
+				x={420}
+				y={340}
+				width={180}
+				columns={[
+					{ label: 'id', x: 456, anchor: 'end', key: true },
+					{ label: 'username', x: 480, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'asha.codes'],
+					['2', 'ravi.clicks'],
+				]}
+				keyTint={{ x: 426, width: 40 }}
+			/>
+
+			<!-- The links: each post's user_id to the user with that id -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M344 406 C 370 400, 392 400, 412 404"></path>
+				<path d="M412 404 l-8.1 -7.5 M412 404 l-9.8 5"></path>
+				<path d="M344 452 C 370 446, 392 446, 412 450"></path>
+				<path d="M412 450 l-8.1 -7.5 M412 450 l-9.8 5"></path>
+				<path d="M344 496 C 380 494, 392 428, 412 414"></path>
+				<path d="M412 414 l-11 0 M412 414 l-3.8 10.4"></path>
+			</g>
+
+			<!-- Annotations: what decides username, and where it lives now -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M306 62 C 330 40, 380 40, 404 60"></path>
+				<path d="M404 60 l-2.9 -10.5 M404 60 l-10.9 -0.9"></path>
+				<path d="M510 524 C 512 518, 509 512, 510 506"></path>
+				<path d="M510 506 l-6.3 9 M510 506 l6.3 9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				text-anchor="middle"
+				aria-hidden="true"
+			>
+				<text x="356" y="28">username depends on user_id</text>
+				<text x="510" y="546">each name once</text>
+			</g>
+		</svg>
+	</div>
+</figure>
