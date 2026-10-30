@@ -149,16 +149,8 @@
 	}
 }
 
-/* Phones: long code lines wrap instead of running off the screen (Copy still copies the
-   original lines), and wide graphics and tables get a note that they scroll (scroll-hint.ts). */
+/* Wide graphics and tables get a note that they scroll sideways (scroll-hint.ts) */
 @layer components {
-	@media (width < 40rem) {
-		[data-code-frame] pre {
-			white-space: pre-wrap;
-			overflow-wrap: anywhere;
-		}
-	}
-
 	[data-scroll-hint] {
 		margin-top: 0.5rem;
 		color: var(--color-ink-muted);
