@@ -1,4 +1,5 @@
 ---
+import BackToTop from '../components/BackToTop.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -33,12 +34,15 @@ const fontsHref =
 	</head>
 	<body>
 		<slot />
+		<BackToTop />
 		<script>
+			import { initBackToTop } from '../scripts/back-to-top';
 			import { revealOnEnter } from '../scripts/reveal';
 			import { showScrollHints } from '../scripts/scroll-hint';
 			import { startSmoothScroll } from '../scripts/smooth-scroll';
 
-			startSmoothScroll();
+			const lenis = startSmoothScroll();
+			initBackToTop(document.querySelector('[data-back-to-top]'), lenis);
 			revealOnEnter(document.querySelectorAll('[data-reveal]'));
 			showScrollHints(document.querySelectorAll<HTMLElement>('[role="region"].overflow-x-auto'));
 		</script>
