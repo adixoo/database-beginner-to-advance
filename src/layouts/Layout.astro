@@ -1,13 +1,28 @@
 ---
 import BackToTop from '../components/BackToTop.astro';
+import { SITE_NAME } from '../config/site';
+import { THEME_COLORS } from '../config/theme';
+import { OG_IMAGE_SIZE, canonicalUrl, ogImagePath, type JsonLd } from '../lib/seo';
 import '../styles/global.css';
 
 interface Props {
 	title: string;
 	description: string;
+	// Open Graph type: "article" for topic pages
+	type?: 'website' | 'article';
+	// Share image path; defaults to this page's generated image
+	image?: string;
+	jsonLd?: readonly JsonLd[];
+	// Keep the page out of search results (the not found page)
+	noindex?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, type = 'website', image, jsonLd = [], noindex = false } = Astro.props;
+
+// `site` is set in astro.config.mjs
+const site = Astro.site!;
+const canonical = canonicalUrl(Astro.url.pathname, site);
+const imageUrl = new URL(image ?? ogImagePath(Astro.url.pathname), site).href;
 
 const fontsHref =
 	'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700' +
@@ -25,6 +40,34 @@ const fontsHref =
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
 		<title>{title}</title>
+		{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+		<meta name="theme-color" content={THEME_COLORS.canvas} />
+		<link rel="sitemap" href="/sitemap-index.xml" />
+
+		<meta property="og:site_name" content={SITE_NAME} />
+		<meta property="og:type" content={type} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image" content={imageUrl} />
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content={String(OG_IMAGE_SIZE.width)} />
+		<meta property="og:image:height" content={String(OG_IMAGE_SIZE.height)} />
+		<meta property="og:image:alt" content={title} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={imageUrl} />
+		{
+			jsonLd.map((data) => (
+				<script
+					is:inline
+					type="application/ld+json"
+					set:html={JSON.stringify(data).replace(/</g, '\\u003c')}
+				/>
+			))
+		}
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link rel="stylesheet" href={fontsHref} />

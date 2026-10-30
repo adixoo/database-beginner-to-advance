@@ -3,6 +3,7 @@ import Footer from '../components/Footer.astro';
 import Navbar from '../components/Navbar.astro';
 import TopicsSidebar from '../components/TopicsSidebar.astro';
 import { SITE_NAME, type Level } from '../config/site';
+import type { JsonLd } from '../lib/seo';
 import Layout from './Layout.astro';
 
 interface Props {
@@ -11,12 +12,14 @@ interface Props {
 	description: string;
 	// Topic id to mark as current in the sidebar
 	currentTopic?: string;
+	type?: 'website' | 'article';
+	jsonLd?: readonly JsonLd[];
 }
 
-const { level, title, description, currentTopic } = Astro.props;
+const { level, title, description, currentTopic, type, jsonLd } = Astro.props;
 ---
 
-<Layout title={`${title} · ${SITE_NAME}`} description={description}>
+<Layout title={`${title} · ${SITE_NAME}`} description={description} type={type} jsonLd={jsonLd}>
 	<div id="top" class="flex flex-col lg:min-h-svh">
 		<Navbar current={level} />
 		<div

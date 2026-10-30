@@ -8,10 +8,12 @@ import PageActions from '../../components/PageActions.astro';
 import TopicPager from '../../components/TopicPager.astro';
 import TopicsMenu from '../../components/TopicsMenu.astro';
 import { MDX_COMPONENTS } from '../../components/markdown';
-import { PATHS } from '../../config/site';
+import { PATHS, SITE_NAME } from '../../config/site';
 import LevelLayout from '../../layouts/LevelLayout.astro';
+import { articleJsonLd, breadcrumbJsonLd, canonicalUrl, ogImagePath } from '../../lib/seo';
 import {
 	getTopics,
+	topicHref,
 	topicSlug,
 	topicsToMarkdown,
 	topicToMarkdown,
@@ -34,6 +36,24 @@ const { topic } = Astro.props;
 const { level } = topic.data;
 const { Content, headings } = await render(topic);
 const levelTopics = await getTopics(level);
+
+const site = Astro.site!;
+const url = canonicalUrl(topicHref(topic), site);
+const jsonLd = [
+	articleJsonLd({
+		title: topic.data.title,
+		description: topic.data.description,
+		url,
+		image: new URL(ogImagePath(topicHref(topic)), site).href,
+		level: PATHS[level].label,
+		site,
+	}),
+	breadcrumbJsonLd([
+		{ name: SITE_NAME, url: canonicalUrl('/', site) },
+		{ name: PATHS[level].label, url: canonicalUrl(PATHS[level].href, site) },
+		{ name: topic.data.title, url },
+	]),
+];
 ---
 
 <LevelLayout
@@ -41,6 +61,8 @@ const levelTopics = await getTopics(level);
 	title={topic.data.title}
 	description={topic.data.description}
 	currentTopic={topic.id}
+	type="article"
+	jsonLd={jsonLd}
 >
 	<div
 		class="xl:grid xl:grid-cols-[minmax(0,64ch)_240px] xl:justify-between xl:gap-12 2xl:grid-cols-[minmax(0,64ch)_280px]"

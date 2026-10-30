@@ -9,11 +9,14 @@ import { TABLE_CLASSES } from '../components/table-styles';
 import { buttonVariants } from '@/components/ui/button';
 import { PATHS, SITE_NAME } from '../config/site';
 import Layout from '../layouts/Layout.astro';
+import { ogImagePath } from '../lib/seo';
 ---
 
 <Layout
 	title={`Page not found · ${SITE_NAME}`}
 	description="This address does not match any page on learndb."
+	image={ogImagePath('/')}
+	noindex
 >
 	<div id="top" class="flex flex-col lg:min-h-svh">
 		<Navbar />

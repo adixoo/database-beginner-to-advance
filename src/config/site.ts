@@ -1,4 +1,8 @@
 export const SITE_NAME = 'learndb';
+// The home page's headline and meta description, also used for its share image and structured data
+export const SITE_TAGLINE = 'Learn about databases';
+export const SITE_DESCRIPTION =
+	'Learn about databases. Start as a beginner, or go straight to advanced.';
 
 export const LEVELS = ['beginner', 'advanced'] as const;
 export type Level = (typeof LEVELS)[number];

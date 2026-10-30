@@ -2,8 +2,9 @@
 import type { GetStaticPaths } from 'astro';
 import PracticeTools from '../../components/PracticeTools.astro';
 import { buttonVariants } from '@/components/ui/button';
-import { LEVELS, PATHS, type LearningPath, type Level } from '../../config/site';
+import { LEVELS, PATHS, SITE_NAME, type LearningPath, type Level } from '../../config/site';
 import LevelLayout from '../../layouts/LevelLayout.astro';
+import { breadcrumbJsonLd, canonicalUrl } from '../../lib/seo';
 import { getTopics, topicHref } from '../../lib/topics';
 
 export const getStaticPaths = (() =>
@@ -12,9 +13,17 @@ export const getStaticPaths = (() =>
 const level = Astro.params.level as Level;
 const path: LearningPath = PATHS[level];
 const [firstTopic] = await getTopics(level);
+
+const site = Astro.site!;
+const jsonLd = [
+	breadcrumbJsonLd([
+		{ name: SITE_NAME, url: canonicalUrl('/', site) },
+		{ name: path.label, url: canonicalUrl(path.href, site) },
+	]),
+];
 ---
 
-<LevelLayout level={level} title={path.label} description={path.summary}>
+<LevelLayout level={level} title={path.label} description={path.summary} jsonLd={jsonLd}>
 	<h1 class="text-[clamp(56px,10vw,152px)] leading-[0.95] font-bold tracking-[-0.03em]" data-reveal>
 		{path.label}
 	</h1>
