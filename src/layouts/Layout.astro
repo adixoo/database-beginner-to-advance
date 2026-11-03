@@ -1,6 +1,6 @@
 ---
 import BackToTop from '../components/BackToTop.astro';
-import { SITE_NAME } from '../config/site';
+import { CLOUDFLARE_BEACON_TOKEN, SITE_NAME } from '../config/site';
 import { THEME_COLORS } from '../config/theme';
 import { OG_IMAGE_SIZE, canonicalUrl, ogImagePath, type JsonLd } from '../lib/seo';
 import '../styles/global.css';
@@ -89,5 +89,16 @@ const fontsHref =
 			revealOnEnter(document.querySelectorAll('[data-reveal]'));
 			showScrollHints(document.querySelectorAll<HTMLElement>('[role="region"].overflow-x-auto'));
 		</script>
+		{
+			// Cloudflare Web Analytics, only on built pages so local dev visits aren't counted
+			import.meta.env.PROD && (
+				<script
+					is:inline
+					type="module"
+					src="https://static.cloudflareinsights.com/beacon.min.js"
+					data-cf-beacon={JSON.stringify({ token: CLOUDFLARE_BEACON_TOKEN })}
+				/>
+			)
+		}
 	</body>
 </html>
