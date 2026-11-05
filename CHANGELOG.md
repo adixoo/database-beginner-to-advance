@@ -1,5 +1,11 @@
 # database-new
 
+## 0.3.0
+
+### Minor Changes
+
+- Storage topics rebuilt around graphics: How rows are stored now only covers storing a row, with new topics How the schema is stored and How rows are read (an indexed lookup and a full table scan), each comparing PostgreSQL, MySQL and SQLite. Disk I/O and fsync defines its two terms, How values are encoded shows two's complement as bits, and the advanced topics are ordered so each one builds on the ones before it.
+
 ## 0.2.0
 
 ### Minor Changes
