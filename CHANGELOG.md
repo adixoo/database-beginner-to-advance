@@ -1,5 +1,11 @@
 # database-new
 
+## 0.2.0
+
+### Minor Changes
+
+- Advanced course: 29 topics that go underneath SQL, from how rows are stored on disk through indexes, query execution, transactions, MVCC, crash recovery and distributed databases, ending with a build-your-own-database capstone, plus an All queries page. How rows are stored is taught with graphics. Also since 0.1.0: the site works well on phones, long code lines scroll sideways with scrollbars shown on hover, a not found page, a back-to-top button with a scroll progress ring, softer running text, a sitemap, robots.txt, structured data and share images, and Cloudflare Web Analytics.
+
 ## 0.1.0
 
 ### Minor Changes
