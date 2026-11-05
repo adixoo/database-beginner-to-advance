@@ -1,0 +1,213 @@
+---
+title: Tricky data types
+description: The types that cause real bugs, such as loose type checks, money in floats, time zones, text sort order and JSON columns.
+level: advanced
+order: 5
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+[Data types](/beginner/data-types) covers which type to pick. This topic covers the ones that still go wrong after you pick them, and why.
+
+## Loose types and STRICT tables
+
+Most databases refuse a value of the wrong type. SQLite, by default, does not. A column's type is only a preference, called its **type affinity**: SQLite converts a value when it can, and stores it as it is when it cannot.
+
+```sql
+CREATE TABLE payments (id INTEGER PRIMARY KEY, amount_cents INTEGER NOT NULL);
+
+INSERT INTO payments (amount_cents) VALUES (1250), ('1250'), ('twelve');
+
+SELECT amount_cents, typeof(amount_cents) FROM payments;
+```
+
+```text
+amount_cents | typeof(amount_cents)
+1250         | integer
+1250         | integer
+twelve       | text
+```
+
+`'1250'` looked like a number, so it became one. `'twelve'` did not, so it was saved as text in an `INTEGER` column. Since SQLite 3.37, a **STRICT** table checks types the way other databases do:
+
+```sql
+DROP TABLE payments;
+
+CREATE TABLE payments (
+  id INTEGER PRIMARY KEY,
+  amount_cents INTEGER NOT NULL
+) STRICT;
+```
+
+Now `'twelve'` fails with `cannot store TEXT value in INTEGER column payments.amount_cents`.
+
+Other engines have their own surprises when types meet in a comparison:
+
+| Expression  | PostgreSQL             | MySQL                     |
+| ----------- | ---------------------- | ------------------------- |
+| `'42' = 42` | true: `'42'` is cast   | true                      |
+| `'abc' = 0` | error: invalid integer | true: `'abc'` becomes `0` |
+
+<Callout type="warning">
+
+Comparing a text column with a number can also stop an index from being used: the database has to convert every row's value before comparing. Compare like with like: `WHERE phone = '0123'`, not `WHERE phone = 123`.
+
+</Callout>
+
+## Money: never in floats
+
+A float stores most decimals as a close approximation ([How values are encoded](/advanced/how-values-are-encoded#floating-point-numbers)). `0.1` is really `0.1000000000000000055...`, so sums drift:
+
+```sql
+SELECT 0.1 + 0.2 = 0.3 AS equal;
+```
+
+```text
+equal
+0
+```
+
+On a few prices nobody notices. Across a million invoices, the totals stop matching the bank. Two safe ways to store money:
+
+- **Whole cents in an integer**, as the `payments` table does. Integer sums are exact. Divide by 100 only when you show the value.
+- **An exact decimal type**: `NUMERIC(12,2)` in PostgreSQL, `DECIMAL(12,2)` in MySQL. These store decimal digits, not binary fractions.
+
+```sql
+INSERT INTO payments (amount_cents) VALUES (1999), (1), (250000);
+
+SELECT sum(amount_cents) AS total_cents,
+  printf('%.2f', sum(amount_cents) / 100.0) AS total
+FROM payments;
+```
+
+```text
+total_cents | total
+252000      | 2520.00
+```
+
+Some currencies have no cents (Japanese yen) and some have three decimal places (Kuwaiti dinar), so store the currency next to the amount.
+
+## Dates, times and time zones
+
+The same moment has a different clock time in every zone: 09:00 in London is 14:30 in Delhi. Mix zones in one column and comparisons go wrong.
+
+The rule for things that **already happened** (orders, logins, posts): store the moment in **UTC**, and convert to the reader's zone only for display.
+
+- **PostgreSQL** has `TIMESTAMP` (a clock time with no zone) and `TIMESTAMPTZ`. Despite its name, `TIMESTAMPTZ` stores no zone: it converts the value to UTC on the way in, and to the session's zone on the way out. Use `TIMESTAMPTZ` for moments.
+- **MySQL** `TIMESTAMP` converts to UTC like this; `DATETIME` stores the clock time as given.
+- **SQLite** has no date type. Store ISO 8601 text such as `'2026-11-05 09:00:00'`, always in UTC and always in the same format.
+
+Text dates sort correctly only when every value has the same format:
+
+```sql
+CREATE TABLE meetings (id INTEGER PRIMARY KEY, title TEXT NOT NULL, starts_at TEXT NOT NULL);
+
+INSERT INTO meetings (title, starts_at)
+VALUES ('Stand-up', '2026-11-05 03:30:00'), ('Review', '2026-11-05T10:00:00Z');
+
+SELECT title FROM meetings WHERE starts_at < '2026-11-05 12:00:00';
+```
+
+Only `Stand-up` comes back, though the review is at 10:00. The text is compared character by character, and `'T'` sorts after `' '`. Normalise both with `datetime()`, which also understands the `Z`:
+
+```sql
+UPDATE meetings SET starts_at = datetime(starts_at);
+
+SELECT title, starts_at, datetime(starts_at, '+5 hours', '+30 minutes') AS delhi_time
+FROM meetings
+ORDER BY starts_at;
+```
+
+<Callout type="info">
+
+Future events are the exception. A meeting "every Monday at 09:00 in Delhi" should stay at 09:00 even if a country changes its daylight saving rules. Store the local time plus the zone name, such as `Asia/Kolkata`, and work out UTC when you need it.
+
+</Callout>
+
+Daylight saving adds two more traps: on the day clocks go forward, some local times never happen, and on the day they go back, an hour happens twice. Durations work out correctly only in UTC.
+
+## Text: sort order and case
+
+How text compares is set by its **collation**. SQLite's default, `BINARY`, compares bytes, so every capital letter sorts before every lowercase one, and accented letters come last:
+
+```sql
+CREATE TABLE profiles (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL COLLATE NOCASE,
+  settings TEXT
+);
+
+INSERT INTO profiles (name, email, settings) VALUES
+  ('asha', 'Asha@Example.com', '{"theme": "dark", "tags": ["sql", "rust"]}'),
+  ('Zoe', 'zoe@example.com', '{"theme": "light", "tags": []}'),
+  ('émile', 'emile@example.com', '{"theme": "dark", "tags": ["go"]}');
+
+SELECT name FROM profiles ORDER BY name;
+
+SELECT name FROM profiles ORDER BY name COLLATE NOCASE;
+
+SELECT name FROM profiles WHERE email = 'asha@example.com';
+```
+
+The first query gives `Zoe, asha, émile`; the second `asha, Zoe, émile`. The last finds Asha, because the `email` column was declared `COLLATE NOCASE`. `NOCASE` only folds the English letters A to Z: `É` and `é` still differ.
+
+In other engines:
+
+- **PostgreSQL** uses the operating system's or ICU's language rules, so `ORDER BY name` sorts like a dictionary for your locale. For case-insensitive matching, use `lower(email)` with an index on `lower(email)`, or the `citext` type.
+- **MySQL**'s default collation, `utf8mb4_0900_ai_ci`, ignores both case and accents: `'emile' = 'Émile'` is true.
+
+<Callout type="danger">
+
+An index is sorted by its collation. If an operating system upgrade changes the sort rules (glibc 2.28 did, for many languages), PostgreSQL indexes on text can silently return wrong results until you `REINDEX` them.
+
+</Callout>
+
+## JSON columns
+
+A JSON column holds a whole document in one value. It suits data whose shape changes, such as user settings or webhook payloads. SQLite reads it with JSON functions:
+
+```sql
+SELECT name, settings ->> '$.theme' AS theme FROM profiles;
+
+SELECT p.name, tag.value AS tag
+FROM profiles AS p, json_each(p.settings, '$.tags') AS tag;
+```
+
+`->>` pulls out one value. `json_each` turns an array into rows, so you can filter and join on it.
+
+PostgreSQL's `JSONB` stores JSON in a parsed binary form and can index it with a GIN index ([Specialised indexes](/advanced/specialised-indexes)). PostgreSQL also has real array columns:
+
+```sql illustration
+-- PostgreSQL
+CREATE TABLE profiles (id BIGINT PRIMARY KEY, settings JSONB, tags TEXT[]);
+
+SELECT * FROM profiles WHERE settings ->> 'theme' = 'dark';
+SELECT * FROM profiles WHERE 'sql' = ANY (tags);
+```
+
+<Callout type="warning">
+
+Anything you filter, join or count on often belongs in a real column. A JSON value has no type checks, no foreign keys and no `NOT NULL`, and the planner has no statistics about what is inside it.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Collation**
+  The rules for comparing and sorting text, such as whether case matters.
+- **ISO 8601**
+  The standard date format, year first: `2026-11-05 09:00:00`.
+- **JSONB**
+  PostgreSQL's binary JSON type, which can be indexed.
+- **STRICT table**
+  An SQLite table that refuses values of the wrong type.
+- **Type affinity**
+  SQLite's preferred type for a column, which it converts values to when it can.
+- **UTC**
+  Coordinated Universal Time: the one clock every time zone is measured from.
+
+</WordsToKnow>

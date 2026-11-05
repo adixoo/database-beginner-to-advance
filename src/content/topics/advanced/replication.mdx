@@ -1,0 +1,148 @@
+---
+title: Replication
+description: Replication keeps copies of a database on several servers, so it survives a dead machine and can serve more reads.
+level: advanced
+order: 24
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+**Replication** means keeping a copy of the same data on more than one server. Each copy is a **replica**.
+
+## Why replicate
+
+- **Availability.** If the server holding your only copy dies, your app is down. With a replica, another server takes over in seconds.
+- **Read scaling.** Reads can go to any replica, so ten replicas can answer roughly ten times as many `SELECT`s.
+- **Distance.** A replica in Mumbai answers Indian users faster than one in Virginia.
+- **Safe heavy work.** Reports and backups can run on a replica without slowing the main server.
+
+Replication does **not** make writes faster: every write still has to reach every copy.
+
+## Primary and replicas
+
+The most common setup has one **primary** (also called the leader) that accepts writes, and any number of **replicas** (followers) that copy it:
+
+```text
+            writes
+  App ───────────────▶ Primary
+   │                     │  ships its log
+   │ reads               ├──────────▶ Replica 1
+   └────────────────────▶│
+                         └──────────▶ Replica 2
+```
+
+The primary already writes every change to a log for crash safety (see [WAL and crash recovery](/advanced/wal-and-crash-recovery)). Replication simply sends that log to the replicas, which replay it in the same order.
+
+| Engine     | What it ships                                                   |
+| ---------- | --------------------------------------------------------------- |
+| PostgreSQL | WAL records (streaming replication)                             |
+| MySQL      | The binary log (binlog)                                         |
+| SQLite     | Nothing built in; tools like Litestream ship its WAL to storage |
+
+## Physical vs logical replication
+
+| Kind     | Sends                                        | Good for                                                             | Limits                                               |
+| -------- | -------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------- |
+| Physical | Byte changes to pages: "page 812, offset 40" | Exact copies, failover                                               | Same engine version and platform; whole cluster only |
+| Logical  | Row changes: "insert into `orders` (7, …)"   | Upgrades across versions, copying some tables, feeding other systems | Slower; schema changes (DDL) often not replicated    |
+
+In PostgreSQL, streaming replication is physical and `CREATE PUBLICATION` / `CREATE SUBSCRIPTION` is logical:
+
+```sql illustration
+-- On the source (PostgreSQL)
+CREATE PUBLICATION shop_pub FOR TABLE orders, customers;
+
+-- On the target
+CREATE SUBSCRIPTION shop_sub
+  CONNECTION 'host=primary.internal dbname=shop user=replicator'
+  PUBLICATION shop_pub;
+```
+
+Logical replication is also how **change data capture** tools such as Debezium stream every row change into Kafka.
+
+## Synchronous vs asynchronous
+
+The big choice: does `COMMIT` wait for the replicas?
+
+| Mode         | `COMMIT` returns when…                 | Cost                         | If the primary dies…                              |
+| ------------ | -------------------------------------- | ---------------------------- | ------------------------------------------------- |
+| Asynchronous | The primary has the change on its disk | Fastest                      | The last few changes not yet shipped are **lost** |
+| Synchronous  | At least one replica also has it       | One extra network round trip | Nothing committed is lost                         |
+| Semi-sync    | (MySQL) a replica has _received_ it    | Between the two              | Very little is lost                               |
+
+Most setups are asynchronous by default. A common middle ground is one synchronous replica plus several asynchronous ones (in PostgreSQL, `synchronous_standby_names = 'FIRST 1 (replica_a, replica_b)'`), so a commit waits for only one of them.
+
+<Callout type="warning">
+
+With a purely synchronous replica, if that replica goes down, the primary stops accepting commits. That is why you name two candidates and wait for any one.
+
+</Callout>
+
+## Replication lag
+
+An asynchronous replica is always a little behind. Usually by milliseconds, but under heavy load or a slow network, by seconds or minutes. This causes real bugs:
+
+- **Read your own writes.** A user edits their bio, the page reloads from a replica that has not caught up, and the old bio appears. Fix: read a user's own data from the primary for a short while after they write it.
+- **Moving back in time.** Two refreshes hit two replicas with different lag, so a new comment appears, then disappears. Fix: pin each user to one replica.
+
+Check the lag in PostgreSQL on the primary:
+
+```sql illustration
+SELECT client_addr, state, replay_lag
+FROM pg_stat_replication;
+```
+
+## Failover
+
+When the primary dies, a replica must be **promoted** to take its place. Tools such as Patroni (PostgreSQL) or Orchestrator (MySQL) automate this:
+
+1. Notice the primary is gone, usually by a missed heartbeat for a few seconds.
+2. Pick the replica that is furthest ahead.
+3. Promote it and point the app (or a proxy, or a DNS name) at it.
+
+The danger is **split brain**: the old primary was only slow, not dead, comes back, and still thinks it is the primary. Now two servers accept writes and the data splits. Real systems prevent it with **fencing**: cut the old primary off (revoke its network, power it off, or have storage reject its writes) before the new one starts. Deciding who is primary safely is a consensus problem; see [Consensus and distributed transactions](/advanced/consensus-and-distributed-transactions).
+
+## Multi-leader and leaderless
+
+Some systems let more than one node accept writes:
+
+- **Multi-leader**: one leader per data centre, each replicating to the others. Writes are fast locally, but two leaders can change the same row at the same time.
+- **Leaderless** (Dynamo-style: Cassandra, Riak, DynamoDB): the client writes to several nodes directly. With **N** copies, a write waits for **W** of them and a read asks **R** of them. If **R + W > N**, every read overlaps at least one node with the latest write. With N = 3, W = 2, R = 2 is the usual choice.
+
+Both need a rule for **conflicts**:
+
+| Strategy              | How it works                                                | Catch                                           |
+| --------------------- | ----------------------------------------------------------- | ----------------------------------------------- |
+| Last write wins (LWW) | Keep the version with the latest timestamp                  | Silently throws other writes away; clocks drift |
+| Application merge     | Keep both versions and let the app decide                   | More code                                       |
+| CRDTs                 | Data types (counters, sets) designed so merges always agree | Only fits certain kinds of data                 |
+
+## Words to know
+
+<WordsToKnow>
+
+- **Asynchronous replication**
+  COMMIT returns before replicas have the change, so a crash can lose the last few writes.
+- **Failover**
+  Promoting a replica to primary when the primary fails.
+- **Fencing**
+  Cutting off an old primary so it cannot keep accepting writes.
+- **Logical replication**
+  Copying row-level changes instead of raw page bytes.
+- **Physical replication**
+  Copying the exact byte changes to pages, giving an identical copy.
+- **Primary**
+  The server that accepts writes and sends its changes to replicas.
+- **Quorum**
+  The number of nodes that must answer for a read or write to count.
+- **Replica**
+  A server that keeps a copy of the primary's data.
+- **Replication lag**
+  How far a replica is behind the primary.
+- **Split brain**
+  Two servers both believing they are the primary and accepting writes.
+- **Synchronous replication**
+  COMMIT waits until a replica also has the change.
+
+</WordsToKnow>

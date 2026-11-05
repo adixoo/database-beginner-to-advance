@@ -1,0 +1,233 @@
+---
+// A slotted page: the header at the start, then the slot array growing forwards, free space in
+// the middle, and the rows written from the end of the page backwards. Each slot (sky) points
+// at its row, so row 1 sits at the very end. Below ~540px it scrolls sideways.
+
+interface Slot {
+	label: string;
+	x: number;
+}
+
+interface Row {
+	label: string;
+	value: string;
+	x: number;
+	width: number;
+}
+
+const FRAME = { x: 10, y: 40, width: 470, height: 352 };
+const INNER_X = 26;
+const INNER_WIDTH = 438;
+const HEADER = { y: 56, height: 40 };
+const SLOT_Y = 110;
+const SLOT_WIDTH = 96;
+const SLOT_HEIGHT = 40;
+const FREE = { y: 164, height: 140 };
+const ROW_Y = 316;
+const ROW_HEIGHT = 60;
+const BYTE_LABEL_X = 494;
+
+const SLOTS: Slot[] = [
+	{ label: 'slot 1', x: 26 },
+	{ label: 'slot 2', x: 128 },
+	{ label: 'slot 3', x: 230 },
+];
+
+// Written from the end of the page backwards: row 1 first, at the very end
+const ROWS: Row[] = [
+	{ label: 'row 1', value: 'Buy milk', x: 364, width: 100 },
+	{ label: 'row 2', value: 'Call Ravi', x: 256, width: 104 },
+	{ label: 'row 3', value: 'Book the trek', x: 122, width: 130 },
+];
+
+const slotCentre = (slot: Slot): number => slot.x + SLOT_WIDTH / 2;
+const rowCentre = (row: Row): number => row.x + row.width / 2;
+const pointerStart = SLOT_Y + SLOT_HEIGHT + 2;
+const pointerEnd = ROW_Y - 6;
+const pointerBend = (pointerStart + pointerEnd) / 2;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Slotted page diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 410"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="sp-title sp-desc"
+		>
+			<title id="sp-title">Inside a slotted page</title>
+			<desc id="sp-desc">
+				A 4 KB page from byte 0 to byte 4095. It starts with the page header, then the slot array:
+				slot 1, slot 2, slot 3, growing forwards. The rows are written from the end of the page
+				backwards: row 1 (Buy milk) at the very end, then row 2 (Call Ravi), then row 3 (Book the
+				trek). Each slot points at its row. Free space is the gap in the middle.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<text
+					x={FRAME.x + 4}
+					y={FRAME.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">one 4 KB page</text
+				>
+				<rect
+					x={FRAME.x}
+					y={FRAME.y}
+					width={FRAME.width}
+					height={FRAME.height}
+					rx="14"
+					fill="var(--color-surface)"></rect>
+
+				<!-- Page header -->
+				<rect
+					x={INNER_X}
+					y={HEADER.y}
+					width={INNER_WIDTH}
+					height={HEADER.height}
+					rx="8"
+					fill="var(--color-raised)"></rect>
+				<text
+					x={INNER_X + 16}
+					y={HEADER.y + 25}
+					font-size="15"
+					font-weight="600"
+					fill="var(--color-ink)">page header</text
+				>
+				<text
+					x={INNER_X + INNER_WIDTH - 16}
+					y={HEADER.y + 25}
+					text-anchor="end"
+					font-size="13"
+					fill="var(--color-ink-muted)">type · 3 slots · where free space is</text
+				>
+
+				<!-- Slot array -->
+				{
+					SLOTS.map((slot) => (
+						<g>
+							<rect
+								x={slot.x}
+								y={SLOT_Y}
+								width={SLOT_WIDTH}
+								height={SLOT_HEIGHT}
+								rx="8"
+								fill="var(--color-sky)"
+								fill-opacity="0.14"
+								stroke="var(--color-sky)"
+								stroke-width="2"
+							/>
+							<text
+								x={slotCentre(slot)}
+								y={SLOT_Y + 25}
+								text-anchor="middle"
+								font-family="var(--font-mono)"
+								font-size="14"
+								fill="var(--color-ink)"
+							>
+								{slot.label}
+							</text>
+						</g>
+					))
+				}
+
+				<!-- Free space -->
+				<rect
+					x={INNER_X}
+					y={FREE.y}
+					width={INNER_WIDTH}
+					height={FREE.height}
+					rx="8"
+					fill="none"
+					stroke="var(--color-gray-600)"
+					stroke-width="2"
+					stroke-dasharray="6 6"></rect>
+				<text
+					x={INNER_X + INNER_WIDTH - 16}
+					y={FREE.y + 24}
+					text-anchor="end"
+					font-size="15"
+					fill="var(--color-ink-muted)">free space</text
+				>
+
+				<!-- Rows, from the end backwards -->
+				{
+					ROWS.map((row) => (
+						<g>
+							<rect
+								x={row.x}
+								y={ROW_Y}
+								width={row.width}
+								height={ROW_HEIGHT}
+								rx="8"
+								fill="var(--color-raised)"
+							/>
+							<text
+								x={rowCentre(row)}
+								y={ROW_Y + 22}
+								text-anchor="middle"
+								font-size="13"
+								fill="var(--color-ink-muted)"
+							>
+								{row.label}
+							</text>
+							<text
+								x={rowCentre(row)}
+								y={ROW_Y + 46}
+								text-anchor="middle"
+								font-family="var(--font-mono)"
+								font-size="14"
+								fill="var(--color-ink)"
+							>
+								{row.value}
+							</text>
+						</g>
+					))
+				}
+			</g>
+
+			<!-- Each slot points at its row -->
+			<g
+				fill="none"
+				stroke="var(--color-sky)"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				{
+					SLOTS.map((slot, index) => {
+						const from = slotCentre(slot);
+						const to = rowCentre(ROWS[index]);
+						return (
+							<Fragment>
+								<path
+									d={`M${from} ${pointerStart} C ${from} ${pointerBend}, ${to} ${pointerBend}, ${to} ${pointerEnd}`}
+								/>
+								<path d={`M${to} ${pointerEnd} l-6.3 -9 M${to} ${pointerEnd} l6.3 -9`} />
+							</Fragment>
+						);
+					})
+				}
+			</g>
+
+			<!-- Byte positions -->
+			<g font-family="var(--font-mono)" font-size="13" fill="var(--color-ink-muted)">
+				<text x={BYTE_LABEL_X} y={FRAME.y + 22}>byte 0</text>
+				<text x={BYTE_LABEL_X} y={FRAME.y + FRAME.height - 4}>byte 4095</text>
+			</g>
+
+			<!-- Annotations: which way each end grows -->
+			<g
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="340" y={SLOT_Y + 27}>grows →</text>
+				<text x="32" y={ROW_Y + 38}>← grows</text>
+			</g>
+		</svg>
+	</div>
+</figure>

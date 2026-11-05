@@ -1,0 +1,153 @@
+---
+title: Hash indexes
+description: A hash index turns a key into a bucket number, so an exact match takes one step, but it cannot help with ranges or sorting.
+level: advanced
+order: 12
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A [B+ tree](/advanced/b-tree-internals) finds a key by walking down a few levels. A **hash index** skips the walk: it computes where the key must be and goes straight there. The price is that it only answers one question, "where is the row with exactly this value?".
+
+## Hash function and buckets
+
+A **hash function** turns any key into a number. The index has a fixed number of **buckets**, and the key goes in bucket `hash(key) mod N`:
+
+```text
+N = 4 buckets
+
+hash('asha')  = 7342  ->  7342 mod 4 = 2
+hash('ravi')  = 1191  ->  1191 mod 4 = 3
+hash('meera') = 5208  ->  5208 mod 4 = 0
+
+bucket 0: meera -> row 3
+bucket 1: (empty)
+bucket 2: asha  -> row 1
+bucket 3: ravi  -> row 2
+```
+
+To find `'ravi'`, hash it, go to bucket 3, done. The cost does not depend on how many keys there are, which is what "O(1) lookup" means.
+
+A good hash function spreads keys evenly, so no bucket gets far more than its share, and it is fast. Databases use functions like MurmurHash, xxHash or their own; not cryptographic ones like SHA-256, which are needlessly slow here.
+
+## Collisions
+
+Two different keys can land in the same bucket. That is a **collision**, and with enough keys it is certain. There are two classic ways to handle it:
+
+| Method          | How it works                                                             | Trade-off                                                         |
+| --------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| Chaining        | Each bucket holds a list; colliding keys are appended to it              | Simple; long chains slow lookups down                             |
+| Open addressing | Each slot holds one key; on a collision, probe the next slot (and so on) | Cache-friendly in memory; degrades sharply when the table is full |
+
+```text
+Chaining                          Open addressing (linear probing)
+
+bucket 2: asha -> neha -> null    slot 2: asha
+                                  slot 3: ravi
+                                  slot 4: neha   <- wanted 2, took the next free one
+```
+
+On disk, a bucket is usually a page. When the page fills, an **overflow page** is chained to it, which is chaining at page size.
+
+## Load factor and resizing
+
+The **load factor** is keys divided by slots. As it rises, chains get longer or probes get further, and lookups slow down. In-memory hash tables typically resize when the load factor passes about 0.75, by doubling the bucket count and rehashing every key.
+
+Rehashing everything is fine for a few thousand keys in memory. For a 50 GB index on disk, rewriting every page while queries wait is not. On-disk hash indexes grow one bucket at a time instead:
+
+- **Extendible hashing** keeps a directory of 2^d pointers to buckets, chosen by d bits of the hash. When a bucket overflows, only that bucket splits. If it needs more bits than the directory has, the directory doubles, but the directory is small: just pointers.
+- **Linear hashing** splits buckets in a fixed round-robin order (bucket 0, then 1, then 2...) whenever the load factor crosses a limit, no matter which bucket overflowed. No directory at all; overflow chains cover the gap until their bucket's turn comes.
+
+```text
+Extendible hashing, global depth 2
+
+directory          buckets
+  00  ----------->  [ a, f ]
+  01  ----------->  [ b, k, m ]   <- full: split this one only
+  10  ---+
+  11  ---+------->  [ c ]          (two directory entries share one bucket)
+```
+
+PostgreSQL's hash index grows by splitting buckets one at a time, in the spirit of linear hashing.
+
+## What a hash index cannot do
+
+Hashing scatters keys on purpose: `'apple'` and `'apples'` end up in unrelated buckets. So all order is gone:
+
+| Query                                   | B+ tree | Hash index |
+| --------------------------------------- | :-----: | :--------: |
+| `WHERE email = 'a@b.com'`               |   Yes   |    Yes     |
+| `WHERE price BETWEEN 10 AND 20`         |   Yes   |     No     |
+| `WHERE name LIKE 'As%'`                 |   Yes   |     No     |
+| `ORDER BY created_at`                   |   Yes   |     No     |
+| `MIN(id)`, `MAX(id)`                    |   Yes   |     No     |
+| Leading columns of a multi-column index |   Yes   |     No     |
+
+Because a B+ tree also does equality in three or four page reads, most databases default to B+ trees and treat hash indexes as a niche tool.
+
+## Hash indexes in real databases
+
+**PostgreSQL** has them as an index type you ask for:
+
+```sql illustration
+CREATE INDEX idx_sessions_token ON sessions USING HASH (token);
+
+SELECT * FROM sessions WHERE token = 'f3a9c2...';
+```
+
+A PostgreSQL hash index stores only the 4-byte hash code, not the value. For long keys such as tokens or URLs it can be much smaller than a B-tree. It supports only `=`, one column, and cannot enforce `UNIQUE`. Before version 10 it was not written to the WAL and was unsafe after a crash; from 10 on it is crash-safe.
+
+**MySQL** uses hash indexes in the `MEMORY` engine, where they are the default. InnoDB has no hash index you can create, but it builds an **adaptive hash index** in memory on its own, over B+ tree pages that are looked up very often.
+
+**SQLite** has no hash indexes at all. Every index is a B-tree.
+
+<Callout type="info">
+
+The same idea powers the **hash join**: build a hash table on the smaller table's join key, then stream the bigger table past it and look each row up. See [Join algorithms](/advanced/join-algorithms).
+
+</Callout>
+
+## A tiny hash index in code
+
+The core is only a few lines. This one uses chaining:
+
+```python illustration
+class HashIndex:
+    def __init__(self, buckets=8):
+        self.buckets = [[] for _ in range(buckets)]
+
+    def _bucket(self, key):
+        return self.buckets[hash(key) % len(self.buckets)]
+
+    def put(self, key, row_id):
+        self._bucket(key).append((key, row_id))
+
+    def get(self, key):
+        return [row_id for k, row_id in self._bucket(key) if k == key]
+```
+
+Note the `k == key` check in `get`: a bucket can hold other keys that collided, so the index must still compare the real value.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Bucket**
+  One slot or page of a hash index that holds the keys hashing to it.
+- **Chaining**
+  Handling collisions by keeping a list of keys in each bucket.
+- **Collision**
+  Two different keys hashing to the same bucket.
+- **Extendible hashing**
+  Growing a hash index by splitting one bucket at a time, using a directory of hash-bit prefixes.
+- **Hash function**
+  A function that turns a key into a number, spreading keys evenly.
+- **Linear hashing**
+  Growing a hash index by splitting buckets in a fixed order, without a directory.
+- **Load factor**
+  Keys divided by slots; the higher it is, the slower lookups get.
+- **Open addressing**
+  Handling collisions by probing for another free slot in the same table.
+
+</WordsToKnow>

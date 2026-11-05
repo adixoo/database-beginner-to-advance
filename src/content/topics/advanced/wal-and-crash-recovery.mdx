@@ -1,0 +1,166 @@
+---
+title: WAL and crash recovery
+description: A write-ahead log records every change before it reaches the data files, so after a crash the database can redo committed work and undo the rest.
+level: advanced
+order: 23
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+`COMMIT` promises your change survives a crash. But changed pages sit in the [buffer pool](/advanced/buffer-pool) in memory, and writing them all to the data files on every commit would be far too slow. Worse, the power can cut out halfway through writing a page.
+
+The answer almost every database uses is a **write-ahead log** (WAL): an append-only file that records every change _before_ the data files are touched.
+
+## The write-ahead rule
+
+Two rules make the log work:
+
+1. **Log first.** A change's log record must be safely on disk before the changed page is written to the data file.
+2. **Commit = log flushed.** `COMMIT` returns only once the transaction's commit record is on disk, using [fsync](/advanced/disk-io-and-fsync).
+
+The data pages themselves can be written whenever is convenient, even long after the commit. Writing the log is cheap because it is sequential: new records always go on the end.
+
+```text
+UPDATE ──▶ change page in buffer pool ──▶ append log record
+COMMIT ──▶ append commit record ──▶ fsync the log ──▶ "OK" to the app
+later  ──▶ background writer copies dirty pages to the data files
+```
+
+## Log records and LSNs
+
+Each **log record** describes one change: which transaction, which page, and what changed. Every record has a **log sequence number** (LSN), its position in the log, which only ever goes up.
+
+```text
+LSN 1000  txn 7  BEGIN
+LSN 1040  txn 7  page 12: likes 10 → 11 (post 101)
+LSN 1100  txn 8  BEGIN
+LSN 1140  txn 8  page 30: insert post 106
+LSN 1220  txn 7  COMMIT
+            ── crash ──
+```
+
+Every data page also stores a **page LSN**: the LSN of the last change applied to it. That tells recovery whether the page on disk already has a change or still needs it.
+
+## Redo and undo
+
+After a crash, two kinds of work may be wrong on disk:
+
+| Problem                                        | Fix                      |
+| ---------------------------------------------- | ------------------------ |
+| A committed change never reached its data page | **Redo** it from the log |
+| An uncommitted change did reach its data page  | **Undo** it from the log |
+
+In the log above, txn 7 committed, so its change to page 12 must be redone if page 12's LSN is below 1040. Txn 8 never committed, so its insert must be undone if it reached page 30.
+
+PostgreSQL only needs redo. Thanks to [MVCC](/advanced/mvcc), an uncommitted transaction's row versions are simply invisible once it is marked aborted. InnoDB keeps a redo log for redo and an [undo log](/advanced/mvcc#innodb-old-versions-in-the-undo-log) for undo.
+
+## Checkpoints
+
+Without help, recovery would replay the log from the very first record. A **checkpoint** caps that:
+
+1. Write dirty pages from the buffer pool to the data files (or note which ones are still dirty).
+2. Append a checkpoint record to the log.
+
+Recovery starts from the last checkpoint, and older log can be recycled. Frequent checkpoints mean fast recovery but more writing; rare ones the opposite. PostgreSQL's `checkpoint_timeout` (5 minutes by default) and `max_wal_size` set the balance.
+
+## ARIES: recovery in three passes
+
+Most engines follow a design called **ARIES**. After a crash it makes three passes over the log:
+
+1. **Analysis:** read forward from the last checkpoint. Work out which transactions were still running (the losers) and which pages might be dirty.
+2. **Redo:** read forward again and replay every change whose page LSN shows it is missing, even changes by losers. This "repeats history", putting the database back exactly as it was at the crash.
+3. **Undo:** walk backwards and roll back each loser's changes. Each undo is itself logged, so a crash during recovery does not undo anything twice.
+
+```text
+log:  ... checkpoint ─────────────────────────▶ crash
+      Analysis  ───────────────────────────────▶
+      Redo      ───────────────────────────────▶
+      Undo                ◀────────────────────
+```
+
+## Group commit
+
+One fsync can take milliseconds, which would cap you at a few hundred commits a second. **Group commit** collects the commit records of many transactions arriving at the same moment and flushes them with a single fsync.
+
+Some databases let you trade a little safety for speed:
+
+| Setting                                    | Effect on a crash                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------- |
+| PostgreSQL `synchronous_commit = off`      | The last fraction of a second of commits may be lost; nothing is corrupted |
+| MySQL `innodb_flush_log_at_trx_commit = 2` | Flushes about once a second; a power cut can lose that second              |
+
+<Callout type="danger">
+
+Never turn off `fsync` itself (PostgreSQL's `fsync = off`) on data you care about. A crash can then leave the database corrupted, not just missing recent commits.
+
+</Callout>
+
+## Torn pages
+
+A PostgreSQL page is 8 KB, but a disk may only promise to write 4 KB or 512 bytes in one go. A crash mid-write leaves a **torn page**: half new, half old. Replaying a small change onto a torn page can't fix it.
+
+- **PostgreSQL** uses `full_page_writes`: the first time a page changes after each checkpoint, the whole page goes into the WAL. Recovery starts from that clean copy.
+- **InnoDB** uses a **doublewrite buffer**: pages are written to a separate area first, then to their real place, so one good copy always exists.
+
+## SQLite: rollback journal or WAL
+
+SQLite has two modes:
+
+| Mode                                     | Before changing the database file                    | After a crash                                   |
+| ---------------------------------------- | ---------------------------------------------------- | ----------------------------------------------- |
+| Rollback journal (`delete`, the default) | Copies the **original** pages into a `-journal` file | Copies them back: undo                          |
+| WAL                                      | Appends the **new** pages to a `-wal` file instead   | Ignores uncommitted pages in the WAL: redo only |
+
+In WAL mode, readers keep reading the main file plus the committed part of the WAL, so they don't block the writer. A **checkpoint** copies WAL pages back into the main file; SQLite does this on its own once the WAL reaches 1,000 pages.
+
+Ask which mode your database uses:
+
+```sql
+PRAGMA journal_mode;
+```
+
+```text
+journal_mode
+delete
+```
+
+An in-memory database, as some browser editors use, reports `memory` instead. For a database file, switch it once and it stays:
+
+```sql illustration
+PRAGMA journal_mode = WAL;
+PRAGMA wal_checkpoint(TRUNCATE);  -- copy the WAL back and empty it
+```
+
+<Callout type="info">
+
+WAL mode suits most apps: faster writes and readers that never wait for the writer. The catch is that the `-wal` and `-shm` files must stay next to the database file, so copy all three when you move it.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **ARIES**
+  A recovery design with three passes over the log: analysis, redo and undo.
+- **Checkpoint**
+  A point where dirty pages are written out, so recovery can start there instead of at the beginning of the log.
+- **Group commit**
+  Flushing the commit records of many transactions with one fsync.
+- **Log record**
+  One entry in the WAL describing a single change.
+- **Log sequence number**
+  A record's position in the log (LSN), which always grows.
+- **Page LSN**
+  The LSN of the last change applied to a page, stored in the page itself.
+- **Redo**
+  Replaying a logged change that never reached its data page.
+- **Torn page**
+  A page only partly written when a crash hit.
+- **Undo**
+  Reversing a change made by a transaction that never committed.
+- **Write-ahead log**
+  An append-only file where every change is recorded before the data files are touched.
+
+</WordsToKnow>

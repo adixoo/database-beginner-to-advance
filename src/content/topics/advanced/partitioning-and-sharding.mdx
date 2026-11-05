@@ -1,0 +1,169 @@
+---
+title: Partitioning and sharding
+description: Partitioning splits one big table into smaller pieces, and sharding spreads those pieces across several servers.
+level: advanced
+order: 25
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+[Replication](/advanced/replication) copies the **same** data to more servers. That helps reads, but every server still holds everything and takes every write. When the data or the writes outgrow one machine, you split the data instead.
+
+- **Partitioning** splits one table into smaller pieces, called **partitions**, usually on the same server.
+- **Sharding** puts those pieces on **different** servers. Each server holds a **shard**.
+
+## Partitioning on one server
+
+A 2-billion-row `events` table is slow to vacuum, index and clean up. Split it by month and each piece is small. In PostgreSQL this is **declarative partitioning**:
+
+```sql illustration
+-- PostgreSQL
+CREATE TABLE events (
+  id         BIGINT,
+  user_id    BIGINT,
+  created_at TIMESTAMPTZ NOT NULL,
+  payload    JSONB
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE events_2026_10 PARTITION OF events
+  FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
+CREATE TABLE events_2026_11 PARTITION OF events
+  FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
+```
+
+You still query `events`. The planner looks at the `WHERE` clause and skips partitions that cannot match. This is **partition pruning**:
+
+```sql illustration
+EXPLAIN SELECT count(*) FROM events WHERE created_at >= '2026-11-01';
+```
+
+```text
+Aggregate
+  ->  Seq Scan on events_2026_11 events
+        Filter: (created_at >= '2026-11-01 00:00:00+00')
+```
+
+Only November is read. Deleting old data becomes `DROP TABLE events_2026_10`, which is instant, instead of a `DELETE` that touches millions of rows.
+
+| Kind  | Splits by                  | Example                              |
+| ----- | -------------------------- | ------------------------------------ |
+| Range | Value ranges               | One partition per month              |
+| List  | An explicit list of values | `country IN ('IN', 'NP')` per region |
+| Hash  | `hash(key) % n`            | 8 equal partitions by `user_id`      |
+
+## Sharding across servers
+
+Sharding uses the same idea, but each piece lives on a different server. The column that decides where a row goes is the **shard key**.
+
+```text
+           ┌──── router ────┐
+ App ────▶ │ user_id → shard │
+           └───┬───┬───┬────┘
+               ▼   ▼   ▼
+          Shard 1 Shard 2 Shard 3
+          users   users   users
+          1-1M    1M-2M   2M-3M
+```
+
+A router (a proxy, a driver or the app itself) sends each query to the right shard.
+
+## Choosing a shard key
+
+The shard key is the hardest decision and the most expensive to change later. A good one:
+
+- **Appears in most queries**, so each query goes to one shard. For a chat app, `workspace_id` usually beats `message_id`.
+- **Keeps related rows together**, so joins stay on one shard. Shard `orders` and `order_items` both by `customer_id`.
+- **Spreads load evenly**, with many distinct values and no single giant value.
+
+## Hash vs range sharding
+
+| Kind  | How                         | Good at                              | Bad at                                           |
+| ----- | --------------------------- | ------------------------------------ | ------------------------------------------------ |
+| Range | Key ranges per shard        | Range scans: "orders from last week" | Hot spots: new rows all land on the newest shard |
+| Hash  | `hash(key)` picks the shard | Even spread of rows and writes       | Range scans must ask every shard                 |
+
+Plain `hash(key) % N` has a nasty problem: change N from 4 to 5 and about 80% of all keys move to a different shard.
+
+## Consistent hashing
+
+**Consistent hashing** fixes that. Picture a ring of hash values from 0 to 2³²:
+
+```text
+             0
+        ┌────●────┐  ● = server position
+     S3 ●         ● S1
+        │  ring   │   a key goes to the next
+     S2 ●         │   server clockwise
+        └─────────┘
+```
+
+Each server takes a spot on the ring, and each key belongs to the next server clockwise. Adding a server only takes keys from its neighbour: about 1/N of the data moves, not most of it.
+
+To keep the spread even, each server takes many spots, called **virtual nodes** (Cassandra used 256 per node by default for years). DynamoDB, Cassandra and many caches use this.
+
+## Hot partitions
+
+Even a good key can have one value that gets far more traffic than the rest: a celebrity's account, a viral post, a giant customer. That shard melts while others idle. This is the **hot partition** or celebrity problem.
+
+Fixes:
+
+- Add a small random suffix to hot keys (`post_42#0` to `post_42#9`) to spread writes, then read all ten and combine them.
+- Give very large tenants their own shard.
+- Cache reads of hot rows in front of the database.
+
+## Rebalancing
+
+Data grows unevenly, so shards must move over time. The common approach is to create far more shards than servers (say 1,024 shards on 8 servers) and move whole shards between servers. Moving a shard means copying it while it still takes writes, catching up on changes, then switching the router: in effect, a short-lived [replica](/advanced/replication).
+
+## Cross-shard queries
+
+Anything that does not include the shard key must ask **every** shard and merge the answers (scatter-gather). That works, but each query is now only as fast as the slowest shard.
+
+- **Joins** across shards are slow. Co-locate tables on the same key, or copy small lookup tables (countries, plans) to every shard.
+- **Secondary indexes** come in two kinds. A **local index** lives on each shard and covers only its rows, so lookups by that column ask every shard. A **global index** is itself sharded by the indexed column, so lookups are fast, but every write must update a second shard.
+- **Transactions** across shards need a protocol such as two-phase commit; see [Consensus and distributed transactions](/advanced/consensus-and-distributed-transactions).
+
+## Real systems
+
+| System               | Engine underneath | How it shards                                                       |
+| -------------------- | ----------------- | ------------------------------------------------------------------- |
+| Vitess               | MySQL             | A proxy (`vtgate`) routes by a "vindex"; used by YouTube and Slack  |
+| Citus                | PostgreSQL        | An extension; `create_distributed_table('orders', 'customer_id')`   |
+| MongoDB              | Its own           | Range or hashed shard keys, split into chunks that a balancer moves |
+| CockroachDB, Spanner | Their own         | Automatic range splitting; you rarely pick shards yourself          |
+
+<Callout type="info">
+
+Shard last. A single modern server with fast SSDs handles terabytes and tens of thousands of writes per second. Try indexes, partitioning, read replicas and caching first: sharding makes every later change harder.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Consistent hashing**
+  Placing servers and keys on a ring so adding a server moves only a small share of keys.
+- **Global index**
+  A secondary index sharded by the indexed column, not the table's shard key.
+- **Hot partition**
+  A partition or shard that gets far more traffic than the others.
+- **Local index**
+  A secondary index on each shard that covers only that shard's rows.
+- **Partition**
+  One piece of a table split by range, list or hash.
+- **Partition pruning**
+  Skipping partitions that cannot match a query's WHERE clause.
+- **Rebalancing**
+  Moving data between servers so each carries a fair share.
+- **Scatter-gather**
+  Sending a query to every shard and merging the results.
+- **Shard**
+  One piece of the data, living on its own server.
+- **Shard key**
+  The column that decides which shard a row belongs to.
+- **Virtual node**
+  One of many positions a single server takes on a consistent hashing ring.
+
+</WordsToKnow>

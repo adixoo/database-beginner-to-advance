@@ -1,0 +1,181 @@
+---
+title: How values are encoded
+description: How a database turns numbers, text and NULL into bytes, and why the encoding decides how much space each row takes.
+level: advanced
+order: 4
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A page is just bytes ([How rows are stored](/advanced/how-rows-are-stored)). Before a row can go in one, every value in it must become bytes too. How that is done decides how big rows are, how fast they compare and what a column can hold.
+
+## Fixed and variable width
+
+- **Fixed-width** values always take the same number of bytes. A 4-byte integer is 4 bytes whether it holds `0` or `2,000,000,000`. The database can find the third column of a row by adding up sizes, with no searching.
+- **Variable-width** values take as many bytes as they need. Text, blobs and SQLite's integers work this way. The row must then also store each value's length.
+
+## Integers
+
+An integer is stored in binary in a fixed number of bytes. More bytes, bigger range:
+
+| Type (PostgreSQL) | Bytes | Range              |
+| ----------------- | ----: | ------------------ |
+| `SMALLINT`        |     2 | −32,768 to 32,767  |
+| `INTEGER`         |     4 | about ±2.1 billion |
+| `BIGINT`          |     8 | about ±9.2 × 10¹⁸  |
+
+An `INTEGER` id overflows at 2,147,483,647 rows ever inserted, which busy apps do hit. Use `BIGINT` for ids that can grow without limit.
+
+Negative numbers use **two's complement**: flip every bit of the positive number and add 1. In one byte, `1` is `00000001` and `−1` is `11111111`. The same addition circuit then works for both signs. SQLite shows it if you print `−1` in hex:
+
+```sql
+SELECT printf('%x', 255) AS two_five_five, printf('%x', -1) AS minus_one;
+```
+
+```text
+two_five_five | minus_one
+ff            | ffffffffffffffff
+```
+
+`−1` is 8 bytes of all ones: SQLite works with 64-bit integers in memory.
+
+## Byte order
+
+A 4-byte number such as `0x12345678` can be laid out two ways:
+
+| Byte order    | Bytes in memory | Used by                                 |
+| ------------- | --------------- | --------------------------------------- |
+| Big-endian    | `12 34 56 78`   | SQLite's file format, network protocols |
+| Little-endian | `78 56 34 12`   | x86 and ARM CPUs                        |
+
+This is **endianness**. SQLite always writes big-endian, so a `.db` file opens on any machine. PostgreSQL writes in the CPU's own order, so its data files cannot be copied to a machine with a different byte order.
+
+Big-endian has a second use: for unsigned numbers, comparing the bytes left to right gives the same order as comparing the numbers. Key-value stores such as RocksDB rely on this to sort keys with a plain byte compare.
+
+## SQLite's record format
+
+SQLite stores each row as a **record**: a header saying what each value is, then the values packed together with no gaps.
+
+The header holds one **serial type** per column:
+
+| Serial type      | Meaning                    | Bytes in the body |
+| ---------------- | -------------------------- | ----------------: |
+| 0                | `NULL`                     |                 0 |
+| 1, 2, 3, 4, 5, 6 | Integer                    |  1, 2, 3, 4, 6, 8 |
+| 7                | Floating point             |                 8 |
+| 8, 9             | The integer 0 or 1         |                 0 |
+| 13, 15, 17...    | Text of (N − 13) ÷ 2 bytes |      (N − 13) ÷ 2 |
+| 12, 14, 16...    | Blob of (N − 12) ÷ 2 bytes |      (N − 12) ÷ 2 |
+
+So SQLite picks the smallest size that fits each integer: `42` takes 1 byte, `0` and `1` take none. The row `('asha', 42, NULL)` becomes 9 bytes:
+
+```text
+Header                       Body
+04    15        01      00   61 73 68 61   2A
+size  text(4)   int(1)  NULL  a  s  h  a   42
+```
+
+The numbers in the header are **varints**: variable-length integers that use 7 bits per byte, with the top bit meaning "another byte follows". Small numbers take 1 byte; the largest take 9.
+
+## Floating-point numbers
+
+`REAL` and `DOUBLE PRECISION` use the **IEEE 754** 8-byte format: 1 sign bit, 11 bits of exponent and 52 bits of fraction. It covers huge and tiny numbers, but only with about 15 to 17 significant digits. Above 2⁵³ (9,007,199,254,740,992) it cannot even hold every whole number:
+
+```sql
+SELECT 9007199254740993.0 = 9007199254740992.0 AS same;
+```
+
+```text
+same
+1
+```
+
+Two different numbers compare equal because both round to the same double. [Tricky data types](/advanced/tricky-data-types) shows what this means for money.
+
+## Text
+
+Text is stored as a length followed by its bytes in an encoding, almost always **UTF-8**. In UTF-8 a character takes 1 to 4 bytes: English letters take 1, `é` takes 2, most emoji take 4.
+
+```sql
+CREATE TABLE samples (id INTEGER PRIMARY KEY, val);
+
+INSERT INTO samples (val) VALUES (42), (3.14), ('asha'), ('é'), ('🐘'), (x'CAFE'), (NULL);
+
+SELECT val, typeof(val) FROM samples;
+
+SELECT val,
+  length(val) AS characters,
+  length(CAST(val AS BLOB)) AS bytes,
+  hex(val) AS utf8_bytes
+FROM samples
+WHERE typeof(val) = 'text';
+```
+
+```text
+val  | characters | bytes | utf8_bytes
+asha | 4          | 4     | 61736861
+é    | 1          | 2     | C3A9
+🐘   | 1          | 4     | F09F9098
+```
+
+The column has no type, so each value keeps its own: `integer`, `real`, `text`, `blob` and `null`.
+
+<Callout type="warning">
+
+Length limits count different things. PostgreSQL's `VARCHAR(10)` allows 10 characters, whatever their bytes. MySQL's index key limits count bytes, and `utf8mb4` reserves 4 per character. A 255-character column can need 1,020 bytes.
+
+</Callout>
+
+PostgreSQL gives every variable-width value a length header of its own: 1 byte for values under 127 bytes, 4 bytes for longer ones.
+
+## How NULL is stored
+
+`NULL` has no bytes of its own. The row records which columns are null instead:
+
+- **SQLite**: serial type 0 in the record header, and nothing in the body.
+- **PostgreSQL**: a **null bitmap** in the row header, one bit per column. It is only there when the row has at least one null.
+- **MySQL (InnoDB)**: a null bitmap at the start of the row, one bit per nullable column.
+
+So a nullable column that is mostly `NULL` costs almost nothing.
+
+## Alignment and column order
+
+CPUs read an 8-byte number fastest when it starts at a multiple of 8. PostgreSQL lines values up this way, adding unused **padding** bytes when needed. Column order then changes row size:
+
+```sql illustration
+-- PostgreSQL: 1 + 7 padding + 8 + 1 + 7 padding + 8 = 32 bytes of data
+CREATE TABLE padded (a BOOLEAN, b BIGINT, c BOOLEAN, d BIGINT);
+
+-- Same columns, largest first: 8 + 8 + 1 + 1 = 18 bytes of data
+CREATE TABLE packed (b BIGINT, d BIGINT, a BOOLEAN, c BOOLEAN);
+```
+
+On a table of 100 million rows, those 14 bytes are about 1.4 GB. Putting fixed-width 8-byte columns first, then 4, 2 and 1-byte ones, then variable-width text, avoids most padding. SQLite packs values with no padding, so order does not matter there.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Alignment**
+  Placing a value at a byte position that is a multiple of its size, so the CPU reads it quickly.
+- **Endianness**
+  The order of a number's bytes: big-endian puts the biggest byte first, little-endian the smallest.
+- **Fixed-width**
+  A value that always takes the same number of bytes.
+- **IEEE 754**
+  The standard binary format for floating-point numbers.
+- **Null bitmap**
+  A set of bits in a row, one per column, that marks which values are NULL.
+- **Padding**
+  Unused bytes added so the next value is aligned.
+- **Serial type**
+  The number in an SQLite record header that says a value's type and size.
+- **Two's complement**
+  The usual way to store negative integers in binary.
+- **UTF-8**
+  A text encoding that uses 1 to 4 bytes per character.
+- **Varint**
+  A variable-length integer: small values take fewer bytes.
+
+</WordsToKnow>

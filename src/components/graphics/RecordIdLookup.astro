@@ -1,0 +1,206 @@
+---
+// Following a record id: PostgreSQL's ctid (0, 3) names page 0 (peach) and slot 3 (sky). The
+// database jumps to page 0 of the file, reads slot 3 in it, and follows the slot to row 3.
+// Below ~540px it scrolls sideways.
+
+const PAGES = [0, 1, 2];
+const TARGET_PAGE = 0;
+const COLUMN = { x: 200, y: 44, width: 120, height: 44, gap: 8 };
+const ZOOM = { x: 370, y: 44, width: 260, height: 256 };
+const SLOT = { y: 98, width: 70, height: 34 };
+const SLOT_XS = [382, 456, 530];
+const TARGET_SLOT = 2;
+const ROW = { y: 236, height: 48 };
+
+// Written from the end of the page backwards
+const ROWS = [
+	{ label: 'row 1', x: 552, width: 66 },
+	{ label: 'row 2', x: 482, width: 66 },
+	{ label: 'row 3', x: 386, width: 92 },
+];
+
+const pageY = (n: number): number => COLUMN.y + n * (COLUMN.height + COLUMN.gap);
+const slotCentre = SLOT_XS[TARGET_SLOT] + SLOT.width / 2;
+const targetRow = ROWS[TARGET_SLOT];
+const rowCentre = targetRow.x + targetRow.width / 2;
+const pointerStart = SLOT.y + SLOT.height + 2;
+const pointerEnd = ROW.y - 4;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Record id lookup diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 320"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="ri-title ri-desc"
+		>
+			<title id="ri-title">A record id is a page number and a slot</title>
+			<desc id="ri-desc">
+				The PostgreSQL record id (0, 3) means page 0, slot 3. The database jumps to page 0 of the
+				file, without reading pages 1 or 2, then reads slot 3 in that page, which points at row 3.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- The record id -->
+				<text x="14" y="30" font-size="17" font-weight="700" fill="var(--color-ink)">ctid</text>
+				<rect x="10" y={COLUMN.y} width="140" height="56" rx="12" fill="var(--color-raised)"></rect>
+				<text
+					x="80"
+					y={COLUMN.y + 37}
+					text-anchor="middle"
+					font-family="var(--font-mono)"
+					font-size="26"
+					fill="var(--color-ink)"
+					>(<tspan fill="var(--color-peach)" font-weight="700">0</tspan>, <tspan
+						fill="var(--color-sky)"
+						font-weight="700">3</tspan
+					>)</text
+				>
+				<text x="56" y={COLUMN.y + 80} text-anchor="middle" font-size="14" fill="var(--color-peach)"
+					>page</text
+				>
+				<text x="103" y={COLUMN.y + 80} text-anchor="middle" font-size="14" fill="var(--color-sky)"
+					>slot</text
+				>
+
+				<!-- The file: page 0 is the one to read -->
+				<text x={COLUMN.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>the file</text
+				>
+				{
+					PAGES.map((n) => {
+						const isTarget = n === TARGET_PAGE;
+						return (
+							<g>
+								<rect
+									x={COLUMN.x}
+									y={pageY(n)}
+									width={COLUMN.width}
+									height={COLUMN.height}
+									rx="10"
+									fill={isTarget ? 'var(--color-peach)' : 'var(--color-surface)'}
+									fill-opacity={isTarget ? 0.1 : 1}
+									stroke={isTarget ? 'var(--color-peach)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={COLUMN.x + 16}
+									y={pageY(n) + 28}
+									font-size="16"
+									font-weight={isTarget ? 600 : 400}
+									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+								>
+									page {n}
+								</text>
+							</g>
+						);
+					})
+				}
+
+				<!-- Page 0, opened up -->
+				<g fill="none" stroke="var(--color-gray-600)" stroke-width="1.5" stroke-dasharray="4 5">
+					<line x1={COLUMN.x + COLUMN.width} y1={COLUMN.y} x2={ZOOM.x} y2={ZOOM.y}></line>
+					<line
+						x1={COLUMN.x + COLUMN.width}
+						y1={COLUMN.y + COLUMN.height}
+						x2={ZOOM.x}
+						y2={ZOOM.y + ZOOM.height}></line>
+				</g>
+				<text x={ZOOM.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>page 0</text
+				>
+				<rect
+					x={ZOOM.x}
+					y={ZOOM.y}
+					width={ZOOM.width}
+					height={ZOOM.height}
+					rx="14"
+					fill="var(--color-surface)"></rect>
+				<rect x="382" y="56" width="236" height="30" rx="8" fill="var(--color-raised)"></rect>
+				<text x="394" y="76" font-size="13" fill="var(--color-ink-muted)">header</text>
+				{
+					SLOT_XS.map((x, index) => {
+						const isTarget = index === TARGET_SLOT;
+						return (
+							<g>
+								<rect
+									x={x}
+									y={SLOT.y}
+									width={SLOT.width}
+									height={SLOT.height}
+									rx="8"
+									fill={isTarget ? 'var(--color-sky)' : 'var(--color-raised)'}
+									fill-opacity={isTarget ? 0.14 : 1}
+									stroke={isTarget ? 'var(--color-sky)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={x + SLOT.width / 2}
+									y={SLOT.y + 22}
+									text-anchor="middle"
+									font-family="var(--font-mono)"
+									font-size="13"
+									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+								>
+									slot {index + 1}
+								</text>
+							</g>
+						);
+					})
+				}
+				{
+					ROWS.map((row, index) => {
+						const isTarget = index === TARGET_SLOT;
+						return (
+							<g>
+								<rect
+									x={row.x}
+									y={ROW.y}
+									width={row.width}
+									height={ROW.height}
+									rx="8"
+									fill={isTarget ? 'var(--color-peach)' : 'var(--color-raised)'}
+									fill-opacity={isTarget ? 0.1 : 1}
+									stroke={isTarget ? 'var(--color-peach)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={row.x + row.width / 2}
+									y={ROW.y + 29}
+									text-anchor="middle"
+									font-size="14"
+									font-weight={isTarget ? 600 : 400}
+									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+								>
+									{row.label}
+								</text>
+							</g>
+						);
+					})
+				}
+			</g>
+
+			<!-- The jumps: ctid to page 0, slot 3 to its row -->
+			<g
+				fill="none"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<g stroke="var(--color-peach)">
+					<path d="M154 70 C 170 66, 182 66, 194 66"></path>
+					<path d="M194 66 l-9 -6.3 M194 66 l-9 6.3"></path>
+				</g>
+				<g stroke="var(--color-sky)">
+					<path
+						d={`M${slotCentre} ${pointerStart} C ${slotCentre} 190, ${rowCentre} 180, ${rowCentre} ${pointerEnd}`}
+					></path>
+					<path d={`M${rowCentre} ${pointerEnd} l-6.3 -9 M${rowCentre} ${pointerEnd} l6.3 -9`}
+					></path>
+				</g>
+			</g>
+		</svg>
+	</div>
+</figure>

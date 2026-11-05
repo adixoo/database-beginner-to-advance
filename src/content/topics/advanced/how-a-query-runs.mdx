@@ -1,0 +1,203 @@
+---
+title: How a query runs
+description: Follow one SQL query from the text you type, through the parser, planner and executor, to the rows that come back.
+level: advanced
+order: 16
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+SQL says **what** you want, never **how** to get it. Between your text and the rows that come back, the database turns one into the other in a few fixed stages.
+
+## The pipeline
+
+```text
+your SQL text
+     │
+     ▼
+ Parser ──────────── text → tokens → syntax tree (AST)
+     │
+     ▼
+ Analyser ─────────── checks names and types against the catalog
+     │
+     ▼
+ Planner/optimiser ── picks the cheapest way to run it (a plan)
+     │
+     ▼
+ Executor ─────────── runs the plan, pulling rows from storage
+     │
+     ▼
+ Storage ──────────── pages from the buffer pool, or from disk
+```
+
+Every relational database has these stages, though the names differ. We'll walk one query through them. First, a small table to follow along with:
+
+```sql
+CREATE TABLE members (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INTEGER NOT NULL);
+
+INSERT INTO members (name, age)
+VALUES ('Zara', 34), ('Arjun', 17), ('Maya', 22), ('Dev', 15), ('Leela', 41);
+
+SELECT name FROM members WHERE age > 18 ORDER BY name;
+```
+
+## 1. Parsing: text into a tree
+
+The **lexer** cuts the text into **tokens**, the words of SQL:
+
+```text
+SELECT  name  FROM  members  WHERE  age  >  18  ORDER  BY  name  ;
+keyword ident keyword ident keyword ident op number keyword keyword ident end
+```
+
+The **parser** checks the tokens against SQL's grammar and builds an **abstract syntax tree** (AST):
+
+```text
+SelectStatement
+├── columns:  [name]
+├── from:     members
+├── where:    (age > 18)
+│               ├── column: age
+│               └── literal: 18
+└── order by: [name ASC]
+```
+
+A missing comma or a misspelt keyword fails here, as a **syntax error**. The parser knows grammar, but nothing about your tables yet.
+
+## 2. Analysing: does it make sense?
+
+The **analyser** (also called the binder) looks every name up in the **catalog**, the database's own list of tables and columns:
+
+- Does a table called `members` exist?
+- Does it have `name` and `age` columns? Which table do they belong to?
+- What type is `age`, and can it be compared with the number `18`?
+
+`no such column: agee` is an analyser error: the grammar was fine, but the name means nothing.
+
+## 3. Planning: choosing how
+
+The analysed tree becomes a **logical plan**: the operations needed, with no say yet in how to do them.
+
+```text
+Project(name)
+  └── Sort(name)
+        └── Filter(age > 18)
+              └── Scan(members)
+```
+
+The **optimiser** turns it into a **physical plan** by picking a real algorithm for each step:
+
+| Logical step     | Physical choices                                         |
+| ---------------- | -------------------------------------------------------- |
+| Scan(members)    | Read every row, or search an index on `age`              |
+| Filter(age > 18) | Check each row, or let the index skip non-matching rows  |
+| Sort(name)       | Sort in memory, sort on disk, or read an index on `name` |
+
+It estimates the cost of each candidate and keeps the cheapest. [The query optimizer](/advanced/query-optimizer) covers how.
+
+## 4. Executing: the iterator model
+
+Most engines run the plan with the **iterator model**, also called the **Volcano model** after the research system that made it famous. Every operator has the same three methods:
+
+```python illustration
+class Filter:
+    def __init__(self, child, predicate):
+        self.child, self.predicate = child, predicate
+
+    def open(self):
+        self.child.open()
+
+    def next(self):                  # returns one row, or None when done
+        while (row := self.child.next()) is not None:
+            if self.predicate(row):
+                return row
+        return None
+
+    def close(self):
+        self.child.close()
+```
+
+The top operator calls `next()` on its child, which calls `next()` on its child, and so on down to the scan. Rows are **pulled** up the tree one at a time.
+
+Some operators can hand a row up as soon as they get one. Others must see **every** input row first:
+
+| Kind           | Examples                                | First row out after…          |
+| -------------- | --------------------------------------- | ----------------------------- |
+| **Pipelining** | Scan, filter, project, nested-loop join | the first matching input row  |
+| **Blocking**   | Sort, hash aggregate, hash join's build | the whole input has been read |
+
+That's why `ORDER BY` on a million rows takes a moment before the first row appears, while `LIMIT 10` without `ORDER BY` comes back instantly: the pipeline stops pulling after 10 rows.
+
+<Callout type="info">
+
+Analytical databases such as DuckDB pull a **batch** of around 1,000 rows per `next()` call instead of one. Fewer calls and tight loops over arrays make them much faster on big scans. [Row stores vs column stores](/advanced/row-vs-column-stores) explains why.
+
+</Callout>
+
+## A peek inside SQLite
+
+SQLite compiles every statement into a little program for its own virtual machine, the **VDBE**. `EXPLAIN QUERY PLAN` shows the plan it chose:
+
+```sql
+EXPLAIN QUERY PLAN SELECT name FROM members WHERE age > 18 ORDER BY name;
+```
+
+```text
+QUERY PLAN
+|--SCAN members
+`--USE TEMP B-TREE FOR ORDER BY
+```
+
+There is no index on `age` or `name`, so it scans every row and sorts the matches in a temporary B-tree. Plain `EXPLAIN` shows the bytecode itself. Here it is trimmed to the interesting lines, with a note on each:
+
+```sql
+EXPLAIN SELECT name FROM members WHERE age > 18 ORDER BY name;
+```
+
+```text
+addr  opcode        p1  p2  p3   what it does
+4     Column        0   2   1    read age into register 1
+5     Le            2   9   1    if age <= 18, jump to 9 (skip the row)
+6     Column        0   1   3    read name
+7     MakeRecord    3   1   5    pack it into a record
+8     SorterInsert  1   5        add it to the sorter
+9     Next          0   4        go to the next row, loop back to 4
+11    SorterSort    1   16       sort everything (the blocking step)
+12    SorterData    1   6   2    take the next sorted record
+14    ResultRow     4   1        hand one row back to you
+15    SorterNext    1   12       loop back to 12
+```
+
+You can read the plan's shape straight off the jumps: a scan loop with a filter inside, then a sort, then an output loop. [Reading EXPLAIN plans](/advanced/reading-explain-plans) covers the plan output in detail.
+
+<Callout type="normal">
+
+Parsing and planning cost time too. That's one reason prepared statements are faster when you run the same query many times: the database parses and plans once, then only executes.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Abstract syntax tree (AST)**
+  The query's structure as a tree, built by the parser.
+- **Analyser**
+  The stage that checks table and column names against the catalog. Also called the binder.
+- **Blocking operator**
+  An operator that must read all its input before it returns a row, such as sort.
+- **Catalog**
+  The database's own record of its tables, columns, types and indexes.
+- **Iterator model**
+  Running a plan by having each operator pull rows from its child with next(). Also called the Volcano model.
+- **Logical plan**
+  The operations a query needs, without saying which algorithm runs each one.
+- **Physical plan**
+  The logical plan with a concrete algorithm chosen for every step.
+- **Pipelining**
+  Passing each row up the plan as soon as it is ready, without waiting for the rest.
+- **Token**
+  One word of SQL, such as a keyword, a name, a number or an operator.
+
+</WordsToKnow>

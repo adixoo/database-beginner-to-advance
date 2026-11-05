@@ -1,0 +1,195 @@
+---
+title: LSM trees and Bloom filters
+description: How log-structured merge trees turn every write into a fast sequential append, and how Bloom filters keep their reads from checking every file.
+level: advanced
+order: 14
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A [B+ tree](/advanced/b-tree-internals) updates pages in place: to change one key, it reads the page, changes it and writes the whole page back, somewhere random on disk. For write-heavy workloads such as metrics, logs, events and chat messages, those random writes become the bottleneck.
+
+A **log-structured merge tree** (LSM tree) never updates anything in place. It collects writes in memory, writes them out as sorted, read-only files, and merges those files in the background. RocksDB, LevelDB, Cassandra, ScyllaDB and HBase are built this way, and so are many systems on top of them: TiKV and MySQL's MyRocks use RocksDB, and CockroachDB uses Pebble, a RocksDB-style engine.
+
+## The write path
+
+```text
+  write(key, value)
+        |
+        +--> 1. append to the WAL (sequential, on disk)    <- for crash safety
+        |
+        +--> 2. insert into the memtable (sorted, in RAM)
+                     |
+                     |  memtable full (e.g. 64 MB)?
+                     v
+             3. freeze it, write it out as one SSTable (sequential)
+```
+
+1. The write is appended to a [write-ahead log](/advanced/wal-and-crash-recovery), so it survives a crash.
+2. It is inserted into the **memtable**, a sorted structure in memory, usually a skip list or a balanced tree.
+3. When the memtable reaches its size limit, it is frozen and a new one takes over. The frozen one is written to disk, in key order, as an **SSTable** (sorted string table). Then its WAL segment can be deleted.
+
+Every disk write is a long sequential append. Nothing on disk is ever modified; SSTables are immutable once written.
+
+An SSTable holds sorted data blocks, a small index of the first key in each block, a Bloom filter (more on that below), and a footer pointing at those parts.
+
+## The read path
+
+A key could be in the memtable or in any SSTable, and a newer version always beats an older one. So a read checks, in order:
+
+```text
+get('user:42')
+
+  memtable                 -> not here
+  SSTable 9 (newest)       -> not here
+  SSTable 8                -> not here
+  SSTable 7                -> found: return it, stop
+  SSTable 6 ... 1 (older)  -> never checked
+```
+
+The first match wins. That is cheap if the key is recent, and expensive if it is old or missing: in the worst case, a lookup for a key that does not exist must check every file. Two things fight this: compaction keeps the number of files down, and Bloom filters let a read skip most files without opening them.
+
+## Deletes are writes too
+
+Since SSTables are immutable, a delete cannot remove anything. It writes a **tombstone**: a marker saying "this key is deleted as of now". A read that meets the tombstone before any older value returns "not found".
+
+Tombstones are only dropped once compaction has merged them past every older copy of the key. Until then, they take space and slow reads down.
+
+<Callout type="warning">
+
+A pattern that deletes far more than it writes, such as a queue table, can bury reads under tombstones. In Cassandra, tombstones are also kept for `gc_grace_seconds` (10 days by default) so replicas that missed the delete do not bring the data back.
+
+</Callout>
+
+## Compaction
+
+**Compaction** merges several SSTables into new ones: it streams them side by side (like the merge step of merge sort), keeps only the newest version of each key, drops overwritten values and expired tombstones, and writes the result out. Then the old files are deleted.
+
+There are two main strategies:
+
+```text
+Size-tiered: merge files of similar size
+
+  [5][5][5][5]  ->  [20]
+  [20][20][20][20]  ->  [80]
+
+Leveled: each level about 10 times bigger, key ranges do not overlap within a level
+
+  L0: [a-z] [a-z] [a-z]        <- flushed memtables, may overlap
+  L1: [a-f] [g-m] [n-s] [t-z]                         10 MB-ish
+  L2: [a-b] [c-d] [e-f] ... [y-z]                     100 MB-ish
+  L3: ...                                             1 GB-ish
+```
+
+| Strategy    | Long-time default in | Good at                        | Costs                                                        |
+| ----------- | -------------------- | ------------------------------ | ------------------------------------------------------------ |
+| Size-tiered | Cassandra, ScyllaDB  | Low write cost                 | More files per read; can need twice the space mid-compaction |
+| Leveled     | LevelDB, RocksDB     | Reads check one file per level | Rewrites data many times as it moves down the levels         |
+
+## The three amplifications
+
+Every storage engine trades three costs against each other:
+
+- **Write amplification**: bytes written to disk per byte the user wrote. Leveled compaction often writes each byte 10 to 30 times over its life.
+- **Read amplification**: files or pages read per lookup.
+- **Space amplification**: bytes on disk per byte of live data, including stale versions and tombstones.
+
+You cannot minimise all three at once. A B+ tree has low read amplification but writes a whole page (several KB) to change a few bytes. An LSM tree turns writes sequential and compresses well, but pays in reads and in background compaction work.
+
+| Workload                                     | Usually better               |
+| -------------------------------------------- | ---------------------------- |
+| Heavy inserts, few updates, recent reads     | LSM tree                     |
+| Point reads and range scans, moderate writes | B+ tree                      |
+| Tight on disk space                          | LSM (compresses whole files) |
+| Predictable latency, no background spikes    | B+ tree                      |
+
+## Bloom filters
+
+A **Bloom filter** answers "could this key be in this file?" using a few bits per key. It can say **"definitely not"** or **"maybe"**. It never says "no" for a key that is there (no false negatives), but sometimes says "maybe" for a key that is not (a false positive).
+
+It is an array of m bits, all 0, plus k hash functions:
+
+```text
+add('ravi'):   hashes -> 3, 9, 14     set bits 3, 9, 14 to 1
+add('asha'):   hashes -> 1, 9, 20     set bits 1, 9, 20 to 1
+
+now bits 1, 3, 9, 14 and 20 are 1; every other bit is 0
+
+check('meera'): hashes -> 3, 7, 14    bit 7 is 0  -> definitely not here
+check('neha'):  hashes -> 1, 3, 20    all 1       -> maybe (a false positive)
+```
+
+Each SSTable has its own filter, kept in memory. A read checks the filter first and only opens the file on a "maybe". For a key that does not exist, most files are skipped without a single disk read.
+
+### The rough maths
+
+With n keys, m bits and k hash functions, the false positive rate is about:
+
+```text
+p ≈ (1 - e^(-k·n/m))^k        best k ≈ (m/n) · ln 2
+```
+
+In practice that works out to:
+
+| Bits per key | Best k | False positive rate |
+| -----------: | -----: | ------------------: |
+|            5 |      3 |               ~9.2% |
+|           10 |      7 |               ~0.8% |
+|           15 |     10 |              ~0.07% |
+
+Ten bits per key is the common default (RocksDB's classic setting): 100 million keys cost about 125 MB of filter to skip 99% of pointless file reads.
+
+<Callout type="info">
+
+A Bloom filter only helps exact lookups. A range scan such as "all keys from `user:40` to `user:50`" must still open every file whose key range overlaps. RocksDB adds prefix Bloom filters for the common case of scanning one prefix.
+
+</Callout>
+
+You cannot remove a key from a plain Bloom filter, since a bit may be shared with other keys. That is fine here: SSTables are immutable, so their filters are too.
+
+## A Bloom filter in code
+
+```python illustration
+import hashlib
+
+class BloomFilter:
+    def __init__(self, bits=1000, hashes=7):
+        self.bits = [0] * bits
+        self.hashes = hashes
+
+    def _positions(self, key):
+        for i in range(self.hashes):
+            digest = hashlib.blake2b(f'{i}:{key}'.encode(), digest_size=8).digest()
+            yield int.from_bytes(digest, 'big') % len(self.bits)
+
+    def add(self, key):
+        for p in self._positions(key):
+            self.bits[p] = 1
+
+    def might_contain(self, key):
+        return all(self.bits[p] for p in self._positions(key))
+```
+
+## Words to know
+
+<WordsToKnow>
+
+- **Bloom filter**
+  A bit array that says a key is definitely absent or maybe present, using a few bits per key.
+- **Compaction**
+  Merging SSTables in the background to drop old versions and tombstones and reduce the file count.
+- **False positive**
+  A Bloom filter saying "maybe" for a key that is not there.
+- **LSM tree**
+  A storage design that buffers writes in memory and flushes them as sorted, immutable files that are merged later.
+- **Memtable**
+  The sorted in-memory structure that receives new writes before they are flushed.
+- **SSTable**
+  A sorted, immutable file of keys and values written by flushing or compaction.
+- **Tombstone**
+  A marker written to record that a key was deleted.
+- **Write amplification**
+  How many bytes the engine writes to disk for each byte the user wrote.
+
+</WordsToKnow>

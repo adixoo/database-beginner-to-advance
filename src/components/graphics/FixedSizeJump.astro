@@ -1,0 +1,213 @@
+---
+// Why pages are one fixed size. Top: equal 4 KB pages, so page 3 starts at 3 × 4096 and the
+// database jumps straight there (mint). Bottom: pages of different sizes, so finding page 3
+// means hopping through pages 0, 1 and 2 first to learn their sizes (rose). The target page is
+// peach in both. Below ~540px it scrolls sideways.
+
+interface Page {
+	n: number;
+	x: number;
+	width: number;
+}
+
+const PAGE_SIZE = 4096;
+const TARGET = 3;
+const PAGE_HEIGHT = 48;
+const FIXED_Y = 60;
+const VARIABLE_Y = 200;
+
+const FIXED: Page[] = [0, 1, 2, 3, 4].map((n) => ({ n, x: 10 + n * 125, width: 120 }));
+const VARIABLE: Page[] = [
+	{ n: 0, x: 10, width: 80 },
+	{ n: 1, x: 95, width: 170 },
+	{ n: 2, x: 270, width: 60 },
+	{ n: 3, x: 335, width: 140 },
+	{ n: 4, x: 480, width: 150 },
+];
+
+const fixedTarget = FIXED[TARGET];
+const jumpEnd = { x: fixedTarget.x + fixedTarget.width / 2, y: FIXED_Y - 4 };
+
+// One small arc from each page to the next, up to the target
+const HOP_TOP = VARIABLE_Y - 30;
+const hops = VARIABLE.slice(0, TARGET).map((page, index) => {
+	const from = page.x + 14;
+	const to = VARIABLE[index + 1].x + 14;
+	const end = VARIABLE_Y - 6;
+	return {
+		curve: `M${from} ${end} C ${from + 18} ${HOP_TOP}, ${to - 18} ${HOP_TOP}, ${to} ${end}`,
+		head: `M${to} ${end} l-0.3 -10 M${to} ${end} l-9.5 -3.1`,
+	};
+});
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Fixed page size diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 310"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="fsj-title fsj-desc"
+		>
+			<title id="fsj-title">With one fixed page size, any page is one jump away</title>
+			<desc id="fsj-desc">
+				Top: every page is 4 KB, so page 3 starts at byte 3 × 4096 = 12288 and the database jumps
+				straight there. Bottom: if pages had different sizes, the database would have to read page
+				0, then page 1, then page 2 to learn their sizes before it could find where page 3 starts.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- Fixed size -->
+				<text x="14" y="24" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>one fixed size</text
+				>
+				<text
+					x="630"
+					y="24"
+					text-anchor="end"
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink-soft)">page 3 = byte 3 × {PAGE_SIZE} = {TARGET * PAGE_SIZE}</text
+				>
+				{
+					FIXED.map((page) => {
+						const isTarget = page.n === TARGET;
+						return (
+							<g>
+								<rect
+									x={page.x}
+									y={FIXED_Y}
+									width={page.width}
+									height={PAGE_HEIGHT}
+									rx="10"
+									fill={isTarget ? 'var(--color-peach)' : 'var(--color-surface)'}
+									fill-opacity={isTarget ? 0.1 : 1}
+									stroke={isTarget ? 'var(--color-peach)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={page.x + page.width / 2}
+									y={FIXED_Y + 29}
+									text-anchor="middle"
+									font-size="15"
+									font-weight={isTarget ? 600 : 400}
+									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-soft)'}
+								>
+									page {page.n}
+								</text>
+								<text
+									x={page.x}
+									y={FIXED_Y + PAGE_HEIGHT + 20}
+									font-family="var(--font-mono)"
+									font-size="12"
+									fill="var(--color-ink-muted)"
+								>
+									{page.n * PAGE_SIZE}
+								</text>
+							</g>
+						);
+					})
+				}
+
+				<!-- Different sizes -->
+				<text x="14" y={VARIABLE_Y - 46} font-size="17" font-weight="700" fill="var(--color-ink)"
+					>different sizes</text
+				>
+				<text
+					x="630"
+					y={VARIABLE_Y - 46}
+					text-anchor="end"
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink-soft)">page 3 = byte ?</text
+				>
+				{
+					VARIABLE.map((page) => {
+						const isTarget = page.n === TARGET;
+						return (
+							<g>
+								<rect
+									x={page.x}
+									y={VARIABLE_Y}
+									width={page.width}
+									height={PAGE_HEIGHT}
+									rx="10"
+									fill={isTarget ? 'var(--color-peach)' : 'var(--color-surface)'}
+									fill-opacity={isTarget ? 0.1 : 1}
+									stroke={isTarget ? 'var(--color-peach)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={page.x + page.width / 2}
+									y={VARIABLE_Y + 29}
+									text-anchor="middle"
+									font-size="15"
+									font-weight={isTarget ? 600 : 400}
+									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-soft)'}
+								>
+									page {page.n}
+								</text>
+							</g>
+						);
+					})
+				}
+			</g>
+
+			<!-- One jump, straight to page 3 -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d={`M40 ${FIXED_Y - 4} C 140 22, 340 22, ${jumpEnd.x} ${jumpEnd.y}`}></path>
+				<path d={`M${jumpEnd.x} ${jumpEnd.y} l-6.8 -8.7 M${jumpEnd.x} ${jumpEnd.y} l-10.5 3.4`}
+				></path>
+			</g>
+
+			<!-- Hop by hop through the pages before it -->
+			<g
+				fill="none"
+				stroke="var(--color-rose)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				{
+					hops.map((hop) => (
+						<Fragment>
+							<path d={hop.curve} />
+							<path d={hop.head} />
+						</Fragment>
+					))
+				}
+			</g>
+
+			<!-- Annotations -->
+			<g
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="240" y="52" text-anchor="middle">one jump</text>
+				<text x="200" y="298" text-anchor="middle">has to read 0, 1 and 2 first</text>
+			</g>
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M200 276 C 202 268, 198 262, 200 256"></path>
+				<path d="M200 256 l-6.3 9 M200 256 l6.3 9"></path>
+			</g>
+		</svg>
+	</div>
+</figure>

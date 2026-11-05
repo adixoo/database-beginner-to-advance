@@ -1,0 +1,220 @@
+---
+title: NULL and three-valued logic
+description: NULL means unknown, so SQL logic has a third answer besides true and false, and that third answer explains most NULL surprises.
+level: advanced
+order: 8
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+In SQL, `NULL` means **unknown**. Ask "is an unknown value equal to 5?" and the honest answer is "unknown". So SQL logic has three answers: `TRUE`, `FALSE` and `UNKNOWN`. This is **three-valued logic**.
+
+Here is a contacts table with gaps in it, and a block list:
+
+```sql
+CREATE TABLE contacts (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  city TEXT,
+  followers INTEGER
+);
+
+INSERT INTO contacts (id, name, email, phone, city, followers) VALUES
+  (1, 'Asha', 'asha@example.com', NULL, 'Delhi', 100),
+  (2, 'Ravi', NULL, '98100', 'Mumbai', NULL),
+  (3, 'Meera', 'meera@example.com', NULL, NULL, 50),
+  (4, 'Kabir', 'kabir@example.com', '98200', 'Delhi', 30);
+
+CREATE TABLE blocked (contact_id INTEGER);
+
+INSERT INTO blocked (contact_id) VALUES (2), (NULL);
+```
+
+## Comparing with NULL
+
+Any comparison with `NULL` is `UNKNOWN`, which SQLite shows as `NULL`. Even `NULL = NULL`: two unknowns are not known to be equal.
+
+```sql
+SELECT NULL = NULL, NULL <> 1, 1 + NULL, NULL IS NULL, 1 IS NOT NULL;
+```
+
+| `NULL = NULL` | `NULL <> 1` | `1 + NULL` | `NULL IS NULL` | `1 IS NOT NULL` |
+| ------------- | ----------- | ---------- | -------------: | --------------: |
+| NULL          | NULL        | NULL       |              1 |               1 |
+
+That is why you test with `IS NULL`, never `= NULL`. Maths and text joining spread `NULL` too: `1 + NULL` and `'a' || NULL` are both `NULL`.
+
+## The truth tables
+
+`AND`, `OR` and `NOT` follow one rule: if the answer could go either way depending on the unknown, it is `UNKNOWN`.
+
+| a       | b       | a AND b | a OR b  |
+| ------- | ------- | ------- | ------- |
+| TRUE    | UNKNOWN | UNKNOWN | TRUE    |
+| FALSE   | UNKNOWN | FALSE   | UNKNOWN |
+| UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |
+
+`FALSE AND anything` is `FALSE`, and `TRUE OR anything` is `TRUE`, so the unknown doesn't matter there. `NOT UNKNOWN` is still `UNKNOWN`.
+
+## WHERE keeps only TRUE
+
+`WHERE` keeps a row only when the condition is `TRUE`. `FALSE` and `UNKNOWN` are both thrown away. So this misses Meera, whose city is unknown:
+
+```sql
+SELECT name FROM contacts WHERE city <> 'Delhi';
+```
+
+```text
+Ravi
+```
+
+To include her, say so, or use a null-safe comparison:
+
+```sql
+SELECT name FROM contacts WHERE city IS NOT 'Delhi' ORDER BY id;
+```
+
+```text
+Ravi
+Meera
+```
+
+| Null-safe "not equal"  | Engines                                |
+| ---------------------- | -------------------------------------- |
+| `a IS NOT b`           | SQLite                                 |
+| `a IS DISTINCT FROM b` | PostgreSQL, SQLite 3.39+, SQL standard |
+| `NOT (a <=> b)`        | MySQL                                  |
+
+<Callout type="warning">
+
+`CHECK` constraints work the other way round: they reject only `FALSE`. `CHECK (followers >= 0)` lets `NULL` through, because `NULL >= 0` is `UNKNOWN`. Add `NOT NULL` if the value is required.
+
+</Callout>
+
+## The NOT IN trap
+
+"Contacts who are not blocked" looks easy:
+
+```sql
+SELECT name FROM contacts WHERE id NOT IN (SELECT contact_id FROM blocked);
+```
+
+```text
+(no rows)
+```
+
+No rows at all, because the block list contains a `NULL`. For Asha, `1 NOT IN (2, NULL)` means `1 <> 2 AND 1 <> NULL`, which is `TRUE AND UNKNOWN`, which is `UNKNOWN`. Every row ends up `FALSE` or `UNKNOWN`.
+
+`NOT EXISTS` asks a yes/no question per row, so it never hits this:
+
+```sql
+SELECT name
+FROM contacts AS c
+WHERE NOT EXISTS (SELECT 1 FROM blocked AS b WHERE b.contact_id = c.id)
+ORDER BY c.id;
+```
+
+```text
+Asha
+Meera
+Kabir
+```
+
+<Callout type="danger">
+
+Never use `NOT IN (subquery)` on a column that can hold `NULL`. Use `NOT EXISTS`, or add `WHERE contact_id IS NOT NULL` inside the subquery.
+
+</Callout>
+
+## NULL in aggregates
+
+Aggregate functions skip `NULL`s, except `COUNT(*)`, which counts rows:
+
+```sql
+SELECT COUNT(*), COUNT(phone), COUNT(DISTINCT city),
+       AVG(followers), SUM(followers) * 1.0 / COUNT(*)
+FROM contacts;
+```
+
+| COUNT(\*) | COUNT(phone) | COUNT(DISTINCT city) | AVG(followers) | SUM / COUNT(\*) |
+| --------: | -----------: | -------------------: | -------------: | --------------: |
+|         4 |            2 |                    2 |           60.0 |            45.0 |
+
+`AVG` divides 180 by the 3 known values, not by 4 rows. Neither answer is wrong, but they answer different questions. Also: `SUM` of no rows, or of only `NULL`s, is `NULL`, not `0`.
+
+`GROUP BY` and `DISTINCT`, on the other hand, put all `NULL`s together in one group:
+
+```sql
+SELECT city, COUNT(*) FROM contacts GROUP BY city ORDER BY city;
+```
+
+| city   | COUNT(\*) |
+| ------ | --------: |
+| NULL   |         1 |
+| Delhi  |         2 |
+| Mumbai |         1 |
+
+## NULL and UNIQUE
+
+A `UNIQUE` column can hold many `NULL`s in SQLite, PostgreSQL and MySQL, since two unknowns are not known to be equal. SQL Server allows only one. PostgreSQL 15+ can treat them as equal with `UNIQUE NULLS NOT DISTINCT`.
+
+## Sorting NULL
+
+Engines disagree on where `NULL` goes:
+
+| Engine             | `ORDER BY x` (ascending) |
+| ------------------ | ------------------------ |
+| SQLite, MySQL      | NULLs first              |
+| PostgreSQL, Oracle | NULLs last               |
+
+Say what you want, and the result is the same everywhere (MySQL lacks this syntax; use `ORDER BY x IS NULL, x`):
+
+```sql
+SELECT name, city FROM contacts ORDER BY city NULLS LAST, name;
+```
+
+| name  | city   |
+| ----- | ------ |
+| Asha  | Delhi  |
+| Kabir | Delhi  |
+| Ravi  | Mumbai |
+| Meera | NULL   |
+
+## COALESCE and NULLIF
+
+`COALESCE` returns the first value that isn't `NULL`. `NULLIF(a, b)` returns `NULL` when `a = b`, else `a`.
+
+```sql
+SELECT name, COALESCE(email, phone, 'no contact') AS reach_by
+FROM contacts
+ORDER BY id;
+```
+
+| name  | reach_by          |
+| ----- | ----------------- |
+| Asha  | asha@example.com  |
+| Ravi  | 98100             |
+| Meera | meera@example.com |
+| Kabir | kabir@example.com |
+
+`NULLIF` is handy for two jobs: `total / NULLIF(count, 0)` returns `NULL` instead of failing on zero, and `NULLIF(email, '')` treats empty text as missing.
+
+## Words to know
+
+<WordsToKnow>
+
+- **COALESCE**
+  Returns the first of its arguments that is not NULL.
+- **IS DISTINCT FROM**
+  A comparison that treats two NULLs as equal and never returns UNKNOWN.
+- **NULLIF**
+  Returns NULL when its two arguments are equal, otherwise the first one.
+- **Three-valued logic**
+  Logic with three answers, TRUE, FALSE and UNKNOWN, which SQL uses because of NULL.
+- **UNKNOWN**
+  The result of a comparison involving NULL. WHERE treats it like FALSE.
+
+</WordsToKnow>

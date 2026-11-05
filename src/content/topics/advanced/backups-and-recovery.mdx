@@ -1,0 +1,141 @@
+---
+title: Backups and point-in-time recovery
+description: How databases are backed up, how to restore them to any moment before a mistake, and how to know your backups actually work.
+level: advanced
+order: 28
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Disks die, data centres burn, and someone runs `DELETE FROM orders` without a `WHERE`. A **backup** is a copy of the database you can restore from when that happens.
+
+## Two numbers to decide first
+
+| Number | Stands for               | Question it answers                         | Example target |
+| ------ | ------------------------ | ------------------------------------------- | -------------- |
+| RPO    | Recovery point objective | How much recent data can we afford to lose? | 5 minutes      |
+| RTO    | Recovery time objective  | How long can we be down while restoring?    | 1 hour         |
+
+A nightly backup gives an RPO of up to 24 hours. If losing a day of orders is not acceptable, you need the techniques further down.
+
+## Logical vs physical backups
+
+| Kind     | What it saves                                     | Tools                                                      | Good for                                                      | Weak at                                               |
+| -------- | ------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
+| Logical  | SQL (or a portable format) that rebuilds the data | `pg_dump`, `mysqldump`, SQLite `.dump`                     | Small databases, moving between versions, restoring one table | Slow to restore big databases: every index is rebuilt |
+| Physical | The data files themselves, byte for byte          | `pg_basebackup`, Percona XtraBackup, file-system snapshots | Big databases, fast restores                                  | Same engine version only                              |
+
+A logical dump in PostgreSQL and MySQL:
+
+```bash illustration
+pg_dump --format=custom --file=shop.dump shop      # PostgreSQL
+pg_restore --dbname=shop_restored shop.dump
+
+mysqldump --single-transaction shop > shop.sql     # MySQL (InnoDB)
+```
+
+`pg_dump` and `mysqldump --single-transaction` read from one [MVCC](/advanced/mvcc) snapshot, so the dump is consistent even while the app keeps writing.
+
+<Callout type="danger">
+
+Never back up a live database by copying its files with `cp`. The copy catches some pages before a change and others after it, and may not open at all. Use the engine's backup tool, or stop the database first.
+
+</Callout>
+
+## Backing up SQLite
+
+SQLite is one file, but the same rule applies. Use its online backup API (the `.backup` command in the shell), or `VACUUM INTO`, which writes a compact, consistent copy:
+
+```bash illustration
+sqlite3 instagram.db ".backup 'instagram-2026-11-05.db'"
+```
+
+```sql illustration
+VACUUM INTO 'instagram-2026-11-05.db';
+```
+
+## Full, incremental, differential
+
+Copying a 2 TB database every night is slow and expensive. So backups come in three kinds:
+
+| Kind         | Copies                                             | Restore needs                      |
+| ------------ | -------------------------------------------------- | ---------------------------------- |
+| Full         | Everything                                         | Just that backup                   |
+| Incremental  | What changed since the **last backup** of any kind | The full + every incremental since |
+| Differential | What changed since the **last full**               | The full + the latest differential |
+
+A common schedule: a full every Sunday, an incremental every other night.
+
+## Point-in-time recovery
+
+The database already writes every change to its log ([WAL and crash recovery](/advanced/wal-and-crash-recovery)). Keep that log, and you can replay history to **any moment**, not just to the last backup:
+
+```text
+Sunday 02:00          Monday ...            Wednesday 14:31:58     14:32:00
+ base backup ──▶ WAL WAL WAL WAL WAL ──▶ last good change ──▶ DELETE FROM orders (oops)
+                                         ▲
+                                  restore stops here
+```
+
+1. Take a **base backup**: a physical copy of the data files.
+2. **Archive** every WAL segment as it fills (PostgreSQL's `archive_command`, or a tool such as pgBackRest or WAL-G that sends it to object storage).
+3. To recover, restore the base backup, then replay archived WAL up to a target time:
+
+```ini illustration
+# postgresql.conf on the restored server (PostgreSQL 12+), plus an empty recovery.signal file
+restore_command = 'cp /archive/%f %p'
+recovery_target_time = '2026-11-04 14:31:58+05:30'
+```
+
+This is **point-in-time recovery (PITR)**. With WAL archived every minute, the RPO drops to about a minute. MySQL does the same with a physical backup plus its binary logs; managed services (Amazon RDS, Cloud SQL) offer PITR as a setting.
+
+## Snapshots
+
+Cloud disks and file systems such as ZFS can take a **snapshot**: an instant, copy-on-write picture of a whole volume. A snapshot is crash-consistent: restoring it is like recovering after a power cut, which the database handles through its WAL. Copy snapshots off the original disk or account, or they die with it.
+
+## Replication is not a backup
+
+A [replica](/advanced/replication) copies every change within milliseconds, including `DROP TABLE orders`. It protects against a dead server, not against a mistake, a bug or ransomware. You need both.
+
+## The 3-2-1 rule
+
+Keep **3** copies of your data, on **2** different kinds of storage, with **1** copy off-site (another region, another cloud account). Make at least one copy immutable (object-lock or write-once storage), so an attacker with your credentials cannot delete it.
+
+## Test your restores
+
+A backup you have never restored is a hope, not a backup. Real failures found only during an emergency include: backups that were silently empty, missing WAL segments, an encryption key nobody kept, and a restore that takes 14 hours when the RTO is 1.
+
+- **Restore regularly**, ideally automatically: every week, restore the latest backup to a scratch server and run checks.
+- **Check the data**: row counts, a few known records, and the engine's own checks (`PRAGMA integrity_check` in SQLite, `pg_amcheck` in PostgreSQL).
+- **Use checksums**: PostgreSQL's data checksums (`initdb --data-checksums`) and pgBackRest's file checksums catch corrupted pages before you rely on them.
+- **Time it**, and compare against your RTO.
+
+## Words to know
+
+<WordsToKnow>
+
+- **3-2-1 rule**
+  Three copies, two kinds of storage, one off-site.
+- **Base backup**
+  A physical copy of the data files that WAL is replayed on top of.
+- **Differential backup**
+  The changes since the last full backup.
+- **Incremental backup**
+  The changes since the last backup of any kind.
+- **Logical backup**
+  A backup saved as SQL or a portable format that rebuilds the data.
+- **Physical backup**
+  A byte-for-byte copy of the database's files.
+- **Point-in-time recovery**
+  Restoring a base backup, then replaying the log up to a chosen moment.
+- **RPO**
+  Recovery point objective: how much recent data you can afford to lose.
+- **RTO**
+  Recovery time objective: how long you can afford to be down.
+- **Snapshot**
+  An instant copy-on-write picture of a disk or volume.
+- **WAL archiving**
+  Saving every write-ahead log segment so history can be replayed later.
+
+</WordsToKnow>

@@ -1,0 +1,157 @@
+---
+title: Consensus and distributed transactions
+description: How several servers agree on one answer, even when some crash or the network drops messages, and how a transaction can span them.
+level: advanced
+order: 26
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+On one server, a transaction either commits or it does not. Spread data across servers ([replication](/advanced/replication), [sharding](/advanced/partitioning-and-sharding)) and even simple questions get hard: who is the primary right now? Did that write commit on every shard?
+
+## Why agreeing is hard
+
+- **Partial failures.** One server is down while the others run fine. On a single machine, things either work or the whole machine stops.
+- **Silence is ambiguous.** You send a message and hear nothing. Did it never arrive? Did the server crash? Did it do the work and the reply got lost? You cannot tell.
+- **Timeouts are guesses.** Wait 1 second and you may declare a slow server dead. Wait 30 and your app hangs for 30 seconds on every real failure.
+- **Clocks drift.** Two servers' clocks can disagree by milliseconds or more, so "the latest timestamp wins" can pick the wrong write.
+
+**Consensus** is getting a group of servers to agree on a value (who the leader is, what the next log entry is) so that once agreed, it never changes, even if some servers crash.
+
+## Majorities
+
+The trick behind every practical algorithm: decisions need a **majority** (a **quorum**) of the servers. Any two majorities share at least one server, so two conflicting decisions can never both win.
+
+| Servers | Majority | Failures it survives |
+| ------: | -------: | -------------------: |
+|       3 |        2 |                    1 |
+|       4 |        3 |                    1 |
+|       5 |        3 |                    2 |
+|       7 |        4 |                    3 |
+
+Four servers survive no more failures than three, and need one more vote per decision. That is why clusters are almost always 3 or 5 servers.
+
+## Raft
+
+**Raft** is the most widely used consensus algorithm, designed to be easier to understand than its predecessor, Paxos. The servers keep a replicated log, and every server applies the same entries in the same order, so they all end up in the same state (a **replicated state machine**).
+
+### Leader election
+
+Each server is a **follower**, a **candidate** or the **leader**. Time is split into numbered **terms**.
+
+1. The leader sends heartbeats every ~50 ms.
+2. A follower that hears nothing for a random 150-300 ms timeout becomes a candidate, starts a new term and asks for votes.
+3. Each server votes once per term. A candidate with a majority becomes leader.
+
+The random timeout makes it unlikely that two followers stand at once. If they do and the vote splits, both time out and try again in a new term.
+
+### Log replication
+
+```text
+Client ──▶ Leader: append "SET x = 5" at index 7, term 3
+           Leader ──▶ Follower A: append ✓
+           Leader ──▶ Follower B: (slow…)
+           2 of 3 have it → index 7 is committed → apply, reply to client
+```
+
+An entry is **committed** once a majority stores it. The leader tracks the highest committed position, the **commit index**, and followers apply entries up to it. A server can only win an election if its log is at least as up to date as a majority's, so a committed entry is never lost.
+
+<Callout type="info">
+
+Raft only makes progress while a majority can talk to each other. A 5-server cluster split 2 and 3 keeps working on the side of 3; the side of 2 stops accepting writes. That is the fencing you need to avoid split brain.
+
+</Callout>
+
+## Two-phase commit
+
+Consensus keeps **copies** of the same data in agreement. A different problem: one transaction changes rows on **different shards**, say moving money from an account on shard A to one on shard B. Both must commit, or neither.
+
+**Two-phase commit (2PC)** uses a **coordinator**:
+
+```text
+Phase 1, prepare:
+  Coordinator ──▶ Shard A: "can you commit?"   A writes everything to its log, locks rows → "yes"
+  Coordinator ──▶ Shard B: "can you commit?"   B → "yes"
+
+Phase 2, commit:
+  All said yes → Coordinator logs "commit" ──▶ A: commit, B: commit
+  Anyone said no → Coordinator ──▶ everyone: roll back
+```
+
+Once a shard votes yes, it has promised it can commit, even after a crash. PostgreSQL exposes this as `PREPARE TRANSACTION` and `COMMIT PREPARED`; MySQL as `XA` transactions.
+
+```sql illustration
+-- PostgreSQL, on each shard
+BEGIN;
+UPDATE accounts SET balance = balance - 200 WHERE id = 1;
+PREPARE TRANSACTION 'transfer-8812';
+-- later, once every shard has prepared:
+COMMIT PREPARED 'transfer-8812';
+```
+
+The weak spot: if the coordinator crashes after shards vote yes but before it sends the decision, the shards are **stuck**. They hold their locks and can neither commit nor roll back until the coordinator returns. Modern systems such as CockroachDB and Spanner avoid this by storing the coordinator's decision in a Raft group, so it survives the coordinator's crash.
+
+## Sagas
+
+Many services do not share a database at all: payments, stock and shipping each have their own. Locking across them for seconds is not acceptable, so they use a **saga**: a chain of local transactions, each with a **compensating** action that undoes it.
+
+| Step              | If a later step fails, run |
+| ----------------- | -------------------------- |
+| Charge the card   | Refund the card            |
+| Reserve the stock | Release the stock          |
+| Book the courier  | Cancel the booking         |
+
+Sagas are not isolated: for a moment, others can see the card charged but the stock not yet reserved. Design for that.
+
+## Idempotency keys
+
+Retries are everywhere: a request times out, the client sends it again. If the first one did succeed, you have now charged twice. An **idempotency key** fixes this: the client sends a unique id with the request, and the server stores it in the same transaction as the work. A repeat with the same key returns the saved result instead of doing the work again.
+
+```sql illustration
+CREATE TABLE processed_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  response        TEXT NOT NULL
+);
+-- In the same transaction as the charge:
+INSERT INTO processed_requests VALUES ('req_7f3a', '{"status":"paid"}');
+-- A retry hits the primary key and the server returns the stored response.
+```
+
+## Where you meet these
+
+| System      | Uses                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| etcd        | Raft; stores Kubernetes' cluster state                                                                                                                        |
+| CockroachDB | Raft per range of data, plus a 2PC-style protocol for multi-range transactions                                                                                |
+| YugabyteDB  | Raft per shard, PostgreSQL-compatible SQL on top                                                                                                              |
+| Spanner     | Paxos per shard, 2PC across shards, and **TrueTime**: GPS and atomic clocks that bound clock error to a few milliseconds, so commit timestamps can be trusted |
+
+## Words to know
+
+<WordsToKnow>
+
+- **Commit index**
+  In Raft, the highest log position stored on a majority and safe to apply.
+- **Compensating action**
+  A step that undoes an earlier step of a saga.
+- **Consensus**
+  Several servers agreeing on one value that never changes once decided.
+- **Coordinator**
+  The node that runs two-phase commit and decides commit or rollback.
+- **Idempotency key**
+  A unique request id that lets the server ignore repeats of the same request.
+- **Leader election**
+  Choosing which server leads, by majority vote.
+- **Quorum**
+  A majority of servers; any two quorums share at least one server.
+- **Raft**
+  A consensus algorithm built on an elected leader and a replicated log.
+- **Saga**
+  A chain of local transactions, each with an undo step.
+- **Term**
+  In Raft, a numbered period with at most one leader.
+- **Two-phase commit**
+  A protocol that asks every participant to prepare, then tells all to commit or all to roll back.
+
+</WordsToKnow>

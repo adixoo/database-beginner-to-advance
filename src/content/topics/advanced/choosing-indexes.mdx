@@ -1,0 +1,213 @@
+---
+title: Choosing indexes well
+description: How to pick columns and column order for an index, when an index can answer a query on its own, and when an index makes things slower.
+level: advanced
+order: 13
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Adding an index is one line. Adding the _right_ one means knowing how the [B+ tree](/advanced/b-tree-internals) behind it is sorted, and which queries that order can help. This topic uses a table of support tickets:
+
+```sql
+CREATE TABLE tickets (
+  id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  priority INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+INSERT INTO tickets (customer_id, status, priority, email, created_at)
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 20000)
+SELECT
+  i % 500,
+  CASE WHEN i % 50 = 0 THEN 'open' ELSE 'closed' END,
+  i % 3,
+  'User' || (i % 500) || '@Example.com',
+  date('2026-01-01', '+' || (i % 300) || ' days')
+FROM n;
+```
+
+20,000 tickets from 500 customers. Only 2% are `'open'`.
+
+## Composite indexes and the leftmost prefix
+
+A **composite index** covers several columns. Its entries are sorted by the first column, then by the second within each first value, like a phone book sorted by surname, then first name:
+
+```sql
+CREATE INDEX idx_tickets_customer_created ON tickets (customer_id, created_at);
+```
+
+```text
+(41, 2026-12-30)
+(42, 2026-01-03)   <- all of customer 42's tickets sit together,
+(42, 2026-02-14)      already sorted by date
+(42, 2026-06-09)
+(43, 2026-01-01)
+```
+
+That order decides which queries it helps. The rule is the **leftmost prefix**: the index works for conditions on its first column, or its first and second, and so on, but not on a later column alone.
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT * FROM tickets WHERE customer_id = 42 AND created_at >= '2026-06-01';
+
+EXPLAIN QUERY PLAN
+SELECT * FROM tickets WHERE created_at >= '2026-06-01';
+```
+
+```text
+QUERY PLAN
+`--SEARCH tickets USING INDEX idx_tickets_customer_created (customer_id=? AND created_at>?)
+
+QUERY PLAN
+`--SCAN tickets
+```
+
+The second query skips `customer_id`. Dates are sorted only _within_ each customer, so there is no single place to start reading: a phone book cannot find everyone called Ravi.
+
+## Column order: equality first, then range
+
+Say the query is `customer_id = 42 AND created_at >= '2026-06-01'`. Compare the two possible orders:
+
+| Index                       | What the database does                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| `(customer_id, created_at)` | Jumps to customer 42, then to June, and reads only the matching entries                |
+| `(created_at, customer_id)` | Jumps to June, then reads every ticket from June onwards, checking each one's customer |
+
+After a range condition, the index's later columns are no longer in a useful order, so they can only filter, not seek. Put columns compared with `=` first and the one compared with a range (`>`, `<`, `BETWEEN`) last. Among the equality columns, order matters less; pick the one other queries also filter by on its own, so the index serves them too.
+
+## Covering indexes
+
+Normally an index finds the row's location, and the database then fetches the row from the table: a second lookup per match. If every column the query needs is already in the index, that step is skipped. The index **covers** the query:
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT created_at FROM tickets WHERE customer_id = 42;
+```
+
+```text
+QUERY PLAN
+`--SEARCH tickets USING COVERING INDEX idx_tickets_customer_created (customer_id=?)
+```
+
+PostgreSQL calls this an **index-only scan** and lets you add extra payload columns that are stored but not sorted on:
+
+```sql illustration
+CREATE INDEX idx_tickets_customer ON tickets (customer_id) INCLUDE (status, priority);
+```
+
+<Callout type="info">
+
+PostgreSQL can only skip the table for pages its visibility map marks as all-visible. On a table with many recent updates, an "index-only scan" still visits the heap often. `VACUUM` refreshes the map; see [MVCC](/advanced/mvcc).
+
+</Callout>
+
+## Partial indexes
+
+A **partial index** only holds the rows matching a `WHERE`. Support staff mostly query open tickets, which are 2% of the table, so index just those:
+
+```sql
+CREATE INDEX idx_tickets_open ON tickets (priority) WHERE status = 'open';
+
+EXPLAIN QUERY PLAN
+SELECT * FROM tickets WHERE status = 'open' AND priority = 2;
+```
+
+```text
+QUERY PLAN
+`--SEARCH tickets USING INDEX idx_tickets_open (priority=?)
+```
+
+The index is about 50 times smaller than one over every row, and updates to closed tickets never touch it. The query's `WHERE` must clearly imply the index's `WHERE`, or the planner will not use it. SQLite and PostgreSQL support partial indexes; MySQL does not.
+
+## Expression indexes
+
+An index on `email` stores `'User42@Example.com'`. A search on `lower(email)` cannot use it, because the index is not sorted by the lowercased value. Index the expression itself:
+
+```sql
+CREATE INDEX idx_tickets_email_lower ON tickets (lower(email));
+
+EXPLAIN QUERY PLAN
+SELECT * FROM tickets WHERE lower(email) = 'user42@example.com';
+```
+
+```text
+QUERY PLAN
+`--SEARCH tickets USING INDEX idx_tickets_email_lower (<expr>=?)
+```
+
+The query must use the exact same expression. MySQL 8 supports this as functional key parts: `INDEX ((lower(email)))`.
+
+## Selectivity
+
+**Selectivity** is the fraction of rows a condition matches. `customer_id = 42` matches 40 of 20,000 rows, 0.2%: very selective. `status = 'closed'` matches 98%: barely selective at all.
+
+An index lookup costs a random read per matching row, while a full scan reads pages in order, which is much cheaper per row. Once a query returns more than a few percent of the table, scanning usually wins, and a good planner will ignore your index. It decides using statistics, which you refresh with `ANALYZE`; see [The query optimizer](/advanced/query-optimizer).
+
+## When an index makes things slower, or does nothing
+
+| Situation                    | Example                                              | Why                                                               |
+| ---------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| Every write pays for it      | 6 indexes on `tickets`                               | Each `INSERT` updates 7 B-trees: the table plus 6 indexes         |
+| Low selectivity              | Index on `status`, querying `'closed'`               | Thousands of random reads instead of one sequential scan          |
+| Function on the column       | `WHERE substr(created_at, 1, 7) = '2026-06'`         | The index is sorted by `created_at`, not by the function's result |
+| Leading wildcard             | `WHERE email LIKE '%example.com'`                    | Sorted order helps find a prefix, never a suffix                  |
+| Implicit cast                | MySQL: `WHERE phone = 5551234` on a `VARCHAR` column | Every row's text is converted to a number before comparing        |
+| Duplicate or redundant index | `(customer_id)` next to `(customer_id, created_at)`  | The composite already serves every query the single one does      |
+
+Most of these have a rewrite that keeps the index usable. The `substr` one becomes a range:
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT * FROM tickets
+WHERE customer_id = 42 AND created_at >= '2026-06-01' AND created_at < '2026-07-01';
+```
+
+For suffix searches, store the reversed string, or use a trigram index (see [Specialised indexes](/advanced/specialised-indexes)). For the cast, compare text with text: `WHERE phone = '5551234'`.
+
+<Callout type="warning">
+
+Indexes also cost memory. Every index competes for the same [buffer pool](/advanced/buffer-pool) as your table data, so a rarely used index can push hot pages out of cache.
+
+</Callout>
+
+## Finding unused indexes
+
+Databases that track index use will tell you which ones never help:
+
+```sql illustration
+-- PostgreSQL: indexes never scanned since statistics were last reset
+SELECT relname AS table_name, indexrelname AS index_name, idx_scan
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0;
+
+-- MySQL (sys schema)
+SELECT * FROM sys.schema_unused_indexes;
+```
+
+Check on the primary _and_ on replicas, since reports may run only there, and keep indexes that enforce `UNIQUE` or primary keys even if they are never scanned. SQLite keeps no such counters; run `EXPLAIN QUERY PLAN` on your real queries instead.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Composite index**
+  An index on several columns, sorted by the first, then the second within it, and so on.
+- **Covering index**
+  An index holding every column a query needs, so the table is never read.
+- **Expression index**
+  An index on the result of an expression, such as `lower(email)`.
+- **Index-only scan**
+  PostgreSQL's name for answering a query from a covering index alone.
+- **Leftmost prefix**
+  The rule that a composite index helps only conditions on its first columns, in order.
+- **Partial index**
+  An index holding only the rows that match a condition.
+- **Selectivity**
+  The fraction of rows a condition matches; the smaller it is, the more an index helps.
+
+</WordsToKnow>

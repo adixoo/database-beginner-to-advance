@@ -1,0 +1,151 @@
+---
+title: MVCC
+description: Multi-version concurrency control keeps several versions of a row, so readers see a consistent snapshot without ever blocking writers.
+level: advanced
+order: 22
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+With plain [locking](/advanced/locking-and-deadlocks), a report reading a million rows blocks every write to them, and one write blocks the report. **Multi-version concurrency control** (MVCC) removes that wait: a write never overwrites a row in place. It makes a **new version**, and each reader picks the version it is allowed to see.
+
+The rule of thumb: **readers don't block writers, and writers don't block readers.** Two writers on the same row still take turns.
+
+PostgreSQL, MySQL's InnoDB, Oracle and SQL Server (with snapshot isolation on) all use MVCC.
+
+## Row versions in PostgreSQL
+
+PostgreSQL gives every transaction a number, its **transaction ID** (txid). Each row version carries two hidden columns:
+
+- **xmin**: the txid that created this version.
+- **xmax**: the txid that deleted or replaced it, or 0 while it is still current.
+
+Say transaction 100 adds post 101 with 10 likes, then transaction 205 adds a like:
+
+```sql illustration
+UPDATE posts SET likes = 11 WHERE id = 101;  -- run by txid 205
+```
+
+The old version is not changed. PostgreSQL stamps it with `xmax = 205` and writes a new one:
+
+| Version | xmin | xmax | id  | likes |
+| ------- | ---: | ---: | --- | ----: |
+| v1      |  100 |  205 | 101 |    10 |
+| v2      |  205 |    0 | 101 |    11 |
+
+The two versions form a **version chain**: v1 points to v2. A `DELETE` only sets `xmax`; an `UPDATE` is a delete plus an insert.
+
+You can peek at the hidden columns yourself:
+
+```sql illustration
+SELECT xmin, xmax, id, likes FROM posts WHERE id = 101;
+```
+
+## Snapshots: which version can I see?
+
+When a transaction reads, it uses a **snapshot**: a note of which transactions had committed at that moment. A version is visible to you if:
+
+1. the transaction in its `xmin` had **committed** when your snapshot was taken, and
+2. its `xmax` is 0, or belongs to a transaction that had **not** committed when your snapshot was taken (or rolled back).
+
+Run the chain above through it:
+
+| Reader's snapshot          | v1 (xmin 100, xmax 205)        | v2 (xmin 205, xmax 0)         | Sees     |
+| -------------------------- | ------------------------------ | ----------------------------- | -------- |
+| Taken before 205 committed | Visible: 205 not committed yet | Hidden: 205 not committed yet | 10 likes |
+| Taken after 205 committed  | Hidden: replaced by 205        | Visible                       | 11 likes |
+
+Every reader sees exactly one version, and nobody waited. The [isolation level](/advanced/isolation-levels) decides when the snapshot is taken:
+
+- **Read committed:** a fresh snapshot for every statement, so each statement sees the latest commits.
+- **Repeatable read:** one snapshot for the whole transaction, so it never sees anyone else's later commits.
+
+<Callout type="info">
+
+Writers still clash. If A and B both update row 101, B waits for A. If A commits, B either re-reads the new version (read committed) or fails with a [serialization failure](/advanced/isolation-levels#serialization-failures-and-retrying) (repeatable read and above).
+
+</Callout>
+
+## InnoDB: old versions in the undo log
+
+MySQL's InnoDB stores versions differently. It updates the row **in place**, and copies the old values into the **undo log**. Each row keeps a hidden pointer to its previous version there:
+
+```text
+Table:     id 101, likes 11, trx 205 ──▶ undo log: likes 10, trx 100 ──▶ ...
+```
+
+A reader that needs an older version follows the pointers back through the undo log until it finds one its snapshot (InnoDB calls it a **read view**) can see.
+
+|                   | PostgreSQL                   | InnoDB                                  |
+| ----------------- | ---------------------------- | --------------------------------------- |
+| New version goes  | Into the table, as a new row | In place; old one moves to the undo log |
+| Old versions live | In the table                 | In the undo log                         |
+| Cleaned up by     | `VACUUM`                     | The purge thread                        |
+
+## Dead rows and VACUUM
+
+In PostgreSQL, v1 stays in the table after 205 commits. Once no running transaction could ever need it, it is a **dead tuple**: wasted space that every scan still has to step over.
+
+**VACUUM** finds dead tuples and marks their space free for new rows. **Autovacuum** runs it for you once enough rows of a table have changed (by default about 20% of the table).
+
+| Command       | Does                                  | Cost                                            |
+| ------------- | ------------------------------------- | ----------------------------------------------- |
+| `VACUUM`      | Marks dead space reusable             | Runs alongside normal work; file rarely shrinks |
+| `VACUUM FULL` | Rewrites the table with no dead space | Locks the whole table while it runs             |
+
+When dead tuples pile up faster than vacuum clears them, the table and its indexes grow far bigger than the live data. This is called **bloat**, and it makes every scan slower.
+
+```sql illustration
+-- PostgreSQL: tables with the most dead tuples
+SELECT relname, n_live_tup, n_dead_tup, last_autovacuum
+FROM pg_stat_user_tables
+ORDER BY n_dead_tup DESC;
+```
+
+## Long transactions hold back cleanup
+
+Vacuum can only remove a version that **no** open snapshot could still need. One transaction left open for hours, even one sitting idle after `BEGIN`, keeps every version newer than its snapshot alive in every table.
+
+<Callout type="warning">
+
+Watch for transactions that stay open. In PostgreSQL, look for old `xact_start` times or the state `idle in transaction` in `pg_stat_activity`, and set `idle_in_transaction_session_timeout` so forgotten ones are closed. InnoDB shows the same problem as a growing "history list length".
+
+</Callout>
+
+## Transaction ID wraparound
+
+PostgreSQL txids are 32-bit numbers, so they run out after about 4 billion and wrap round to the start. To compare them safely, it only looks about 2 billion transactions back. Rows older than that must be **frozen**: marked as visible to everyone, so their xmin no longer matters. Vacuum does the freezing.
+
+If vacuum falls far enough behind, PostgreSQL stops accepting new writes rather than risk old rows suddenly looking like they are from the future. Keeping autovacuum healthy prevents this.
+
+## SQLite
+
+SQLite has no row versions. In [WAL mode](/advanced/wal-and-crash-recovery#sqlite-rollback-journal-or-wal) it gets a similar effect at the database level: each reader remembers how far into the log it may read, so readers keep a stable snapshot while the one writer appends new pages.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Bloat**
+  Space in a table or index taken up by dead tuples instead of live data.
+- **Dead tuple**
+  A row version no transaction can see any more, waiting for VACUUM.
+- **Freezing**
+  Marking old row versions as visible to everyone, so their transaction IDs can be reused.
+- **MVCC**
+  Keeping several versions of each row so readers and writers don't block each other.
+- **Snapshot**
+  The record of which transactions had committed when a reader started, used to pick visible versions.
+- **Transaction ID**
+  The number PostgreSQL gives each transaction, stored in the row versions it writes.
+- **Undo log**
+  Where InnoDB keeps the old values of changed rows, for rollback and for older snapshots.
+- **VACUUM**
+  The PostgreSQL command that clears dead tuples so their space can be reused.
+- **Version chain**
+  The linked versions of one row, from oldest to newest.
+- **xmin and xmax**
+  The hidden PostgreSQL columns holding the transaction that created and the one that replaced a row version.
+
+</WordsToKnow>

@@ -1,0 +1,188 @@
+---
+title: Locking and deadlocks
+description: Locks make transactions take turns on the same data, and a deadlock is when two of them wait for each other forever.
+level: advanced
+order: 21
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+When two transactions want the same data, one of them has to wait. A **lock** is how the database makes them take turns: a transaction asks for a lock before it touches something, and others that want a clashing lock wait until it is released.
+
+## Shared and exclusive locks
+
+There are two basic kinds:
+
+- A **shared lock** (S) is for reading. Many transactions can hold one on the same row at once.
+- An **exclusive lock** (X) is for writing. Only one transaction can hold it, and nobody else can hold any lock on that row.
+
+Whether a new lock can be granted depends on what is already held:
+
+| Already held → / Asking for ↓ | None | Shared | Exclusive |
+| ----------------------------- | ---- | ------ | --------- |
+| Shared                        | Yes  | Yes    | Wait      |
+| Exclusive                     | Yes  | Wait   | Wait      |
+
+Readers share, writers wait. Databases with [MVCC](/advanced/mvcc), such as PostgreSQL and MySQL's InnoDB, skip read locks for plain `SELECT`s, so readers and writers don't block each other at all. Writers still lock rows they change.
+
+## How much to lock
+
+A lock can cover a row, a page or a whole table. This is its **granularity**:
+
+| Lock on | Good                          | Bad                                         |
+| ------- | ----------------------------- | ------------------------------------------- |
+| Row     | Others can use the other rows | Thousands of locks to track for big changes |
+| Page    | Fewer locks                   | Blocks unrelated rows on the same page      |
+| Table   | One lock, cheap               | Everyone else waits                         |
+
+Mixing them needs **intention locks**. Before locking a row, a transaction puts an "intention exclusive" (IX) lock on its table. Anyone wanting the whole table then sees the IX and waits, without checking every row lock.
+
+SQL Server also does **lock escalation**: once one statement holds about 5,000 row or page locks on a table, it swaps them for a single table lock. That saves memory but can suddenly block everyone else.
+
+## Two-phase locking
+
+Taking locks is not enough; _when_ you release them matters too. **Two-phase locking** (2PL) splits every transaction into two phases:
+
+1. **Growing:** take locks, release none.
+2. **Shrinking:** release locks, take none.
+
+Following this rule guarantees a [serializable](/advanced/isolation-levels) result. Most databases use **strict 2PL**: write locks are held until `COMMIT` or `ROLLBACK`, so nobody ever reads a change that might still be undone.
+
+## Locking rows yourself
+
+Sometimes your app must read a row, decide, then write it, with nobody changing it in between. Lock it while you read:
+
+```sql illustration
+-- PostgreSQL and MySQL
+BEGIN;
+SELECT balance FROM accounts WHERE id = 1 FOR UPDATE;
+-- the app checks the balance is high enough
+UPDATE accounts SET balance = balance - 200 WHERE id = 1;
+COMMIT;
+```
+
+| Clause        | Takes              | Others trying to lock the row                |
+| ------------- | ------------------ | -------------------------------------------- |
+| `FOR UPDATE`  | Exclusive row lock | Wait                                         |
+| `FOR SHARE`   | Shared row lock    | Can also read with `FOR SHARE`; writers wait |
+| `NOWAIT`      | Either, if free    | Fail at once instead of waiting              |
+| `SKIP LOCKED` | Only the free rows | Skip rows that are locked                    |
+
+`SKIP LOCKED` turns a table into a **job queue**. Many workers run the same query, and each gets a different job without waiting:
+
+```sql illustration
+-- Each worker grabs the oldest job nobody else holds
+BEGIN;
+SELECT id, payload FROM jobs
+WHERE status = 'pending'
+ORDER BY id
+LIMIT 1
+FOR UPDATE SKIP LOCKED;
+UPDATE jobs SET status = 'running' WHERE id = 42;  -- the id it got
+COMMIT;
+```
+
+## Deadlocks
+
+A **deadlock** is two transactions each holding a lock the other needs. Ravi pays Asha while Asha pays Ravi:
+
+| Step | Session A                                       | Session B                                       |
+| ---: | ----------------------------------------------- | ----------------------------------------------- |
+|    1 | `UPDATE accounts ... WHERE id = 1;` locks row 1 |                                                 |
+|    2 |                                                 | `UPDATE accounts ... WHERE id = 2;` locks row 2 |
+|    3 | `UPDATE accounts ... WHERE id = 2;` waits for B |                                                 |
+|    4 |                                                 | `UPDATE accounts ... WHERE id = 1;` waits for A |
+
+Neither can move. Without help, they would wait forever.
+
+### Finding them
+
+The database draws a **wait-for graph**: an arrow from each waiting transaction to the one it waits for. A loop means a deadlock:
+
+```text
+A ──waits for──▶ B
+▲                │
+└───waits for────┘
+```
+
+It then picks a victim, rolls it back and lets the other carry on:
+
+- **PostgreSQL** checks for a loop after a lock wait passes `deadlock_timeout` (1 second by default) and fails one transaction with `ERROR: deadlock detected`.
+- **InnoDB** checks straight away and rolls back the transaction that changed the fewest rows. Plain lock waits give up after `innodb_lock_wait_timeout` (50 seconds by default).
+
+Like a [serialization failure](/advanced/isolation-levels#serialization-failures-and-retrying), the victim's app should retry the whole transaction.
+
+### Preventing them
+
+- **Lock in the same order everywhere.** If every transfer updates the lower account id first, A and B both start with row 1, and one simply waits for the other.
+- **Keep transactions short.** Don't wait for a user or a network call while holding locks.
+- **Touch fewer rows.** An index on the `WHERE` column means the database locks only the rows it needs, not every row it scanned.
+
+<Callout type="warning">
+
+Deadlocks are normal in a busy database, not a sign it is broken. Retry the victim, and fix the lock order if one deadlock keeps coming back.
+
+</Callout>
+
+## SQLite: one writer at a time
+
+SQLite does not lock rows; it locks the **whole database**. Many connections can read at once, but only one can write. By default `BEGIN` waits to take locks until the first read or write, so two transactions can both start reading, then both try to write, and one fails with `SQLITE_BUSY`.
+
+`BEGIN IMMEDIATE` takes the write lock at the start, so a clash shows up before you have done any work. Try it with a tiny job queue:
+
+```sql
+CREATE TABLE jobs (
+  id INTEGER PRIMARY KEY,
+  payload TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+);
+
+INSERT INTO jobs (payload) VALUES ('resize photo 101'), ('send welcome email'), ('resize photo 102');
+
+BEGIN IMMEDIATE;
+UPDATE jobs SET status = 'running'
+WHERE id = (SELECT id FROM jobs WHERE status = 'pending' ORDER BY id LIMIT 1)
+RETURNING id, payload;
+COMMIT;
+```
+
+```text
+id | payload
+1  | resize photo 101
+```
+
+Find and claim happen in one statement inside the write lock, so two workers can never claim the same job.
+
+<Callout type="info">
+
+In an app, also set `PRAGMA busy_timeout = 5000;` so a connection waits up to 5 seconds for the lock instead of failing at once.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Deadlock**
+  Two or more transactions each waiting for a lock another one holds, so none can continue.
+- **Exclusive lock**
+  A lock for writing; while it is held, nobody else can lock the same thing.
+- **Intention lock**
+  A table-level lock that says a transaction is locking rows inside the table.
+- **Lock**
+  A marker that makes other transactions wait before touching the same data.
+- **Lock escalation**
+  Replacing many row or page locks with one table lock to save memory.
+- **Lock granularity**
+  How much one lock covers: a row, a page or a whole table.
+- **Shared lock**
+  A lock for reading; many transactions can hold one on the same thing.
+- **SKIP LOCKED**
+  Makes a locking read skip rows other transactions have locked.
+- **Two-phase locking**
+  Taking all locks before releasing any, which makes the result serializable.
+- **Wait-for graph**
+  Arrows from waiting transactions to the ones they wait for; a loop is a deadlock.
+
+</WordsToKnow>

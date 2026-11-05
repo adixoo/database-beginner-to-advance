@@ -1,0 +1,162 @@
+---
+title: The buffer pool
+description: The buffer pool keeps recently used pages in memory, decides which ones to throw out when it is full, and writes changed pages back later.
+level: advanced
+order: 3
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Reading a page from disk takes thousands of times longer than reading it from RAM ([Disk I/O and fsync](/advanced/disk-io-and-fsync)). So a database never works on the disk directly. It copies pages into a block of memory it manages itself, the **buffer pool**, and works on them there.
+
+## The parts
+
+```text
+ Page table             Frames in the buffer pool (RAM)
+┌─────────┬─────────┐  ┌───────────────┬───────────────┬───────────────┐
+│ page 7  │ frame 0 │  │ frame 0       │ frame 1       │ frame 2       │
+│ page 3  │ frame 1 │  │ page 7        │ page 3        │ page 42       │
+│ page 42 │ frame 2 │  │ pins 1, clean │ pins 0, dirty │ pins 0, clean │
+└─────────┴─────────┘  └───────────────┴───────────────┴───────────────┘
+                               ▲ read whole pages    │ write dirty pages back
+                               │                     ▼
+                       ┌─────────────────────────────────────────────┐
+                       │              Data file on disk              │
+                       └─────────────────────────────────────────────┘
+```
+
+- A **frame** is one page-sized slot of memory. A pool of 128 MB with 8 KB pages has 16,384 frames.
+- The **page table** maps a page number to the frame holding it, so the database can tell at once whether a page is in memory.
+- Each frame has a **pin count**: how many queries are using the page right now.
+- Each frame has a **dirty** flag: set when the page was changed in memory and not yet written back.
+
+## Fetching a page
+
+Every page access goes through the pool:
+
+```python illustration
+def fetch_page(page_id):
+    if page_id in page_table:                 # hit: already in memory
+        frame = page_table[page_id]
+    else:                                     # miss: load it from disk
+        frame = find_free_frame() or evict()  # evict() writes it first if dirty
+        read_from_disk(page_id, into=frame)
+        page_table[page_id] = frame
+    frame.pin_count += 1                      # nobody may evict it while in use
+    return frame
+
+def unpin_page(frame, changed):
+    frame.pin_count -= 1
+    if changed:
+        frame.dirty = True                    # write it back later, not now
+```
+
+A **pinned** page can never be evicted: a query is reading it. Forgetting to unpin a page is a classic bug in a home-made database; the pool slowly fills with pages nothing can remove.
+
+The share of fetches that are hits is the **hit ratio**. A busy OLTP database usually aims for 99% or more.
+
+## Choosing a page to evict
+
+When every frame is full, the pool must throw a page out to make room. It may only pick an unpinned one, and the choice matters: evict a page that is needed again soon and you pay a disk read.
+
+### LRU
+
+**LRU** (least recently used) evicts the page that has gone unused the longest. It works well for most workloads, but it needs a sorted list updated on every single page access, which is costly with many threads.
+
+### Clock
+
+**Clock** approximates LRU more cheaply. Frames sit in a circle, each with a reference bit that is set whenever the page is used. A "hand" sweeps round:
+
+```text
+          ┌──── hand
+          ▼
+   [A ref=1] → [B ref=0] → [C ref=1] → [D ref=1]
+       ▲                                   │
+       └───────────────────────────────────┘
+
+A: ref=1 → set to 0, move on
+B: ref=0 → evict B
+```
+
+A page used again before the hand comes back survives. PostgreSQL uses a clock sweep with a usage count from 0 to 5 instead of a single bit, so popular pages survive several passes.
+
+### Why plain LRU breaks on big scans
+
+A query that reads a 50 GB table once touches every page exactly once. Under plain LRU, each of those pages becomes "most recently used" and pushes out the hot pages other queries need. When the scan ends, the pool is full of pages nobody will read again. This is **sequential flooding**.
+
+Engines guard against it:
+
+- **PostgreSQL** gives big sequential scans a small private ring of 256 KB to cycle through, instead of the whole pool.
+- **MySQL (InnoDB)** puts newly read pages in the middle of its LRU list, not at the hot end. A page moves to the hot part only if it is used again more than a second later (`innodb_old_blocks_time`).
+
+## Writing back
+
+A dirty page is not written when it changes: it stays in memory, and many changes to it are saved with a single write later. This is **write-back**. Pages are written when:
+
+- A dirty page is chosen for eviction.
+- A background writer flushes dirty pages ahead of time, so queries rarely wait for a write.
+- A **checkpoint** flushes all of them, so recovery has less log to replay.
+
+That leaves recent commits only in memory, which is safe only because of one rule: a page is never written to disk before the log records describing its changes. [WAL and crash recovery](/advanced/wal-and-crash-recovery) covers that rule.
+
+## Sizing the pool
+
+| Engine         | Setting                   | Default                   | Common starting point              |
+| -------------- | ------------------------- | ------------------------- | ---------------------------------- |
+| PostgreSQL     | `shared_buffers`          | 128 MB                    | About 25% of RAM                   |
+| MySQL (InnoDB) | `innodb_buffer_pool_size` | 128 MB                    | 50 to 75% of RAM on its own server |
+| SQLite         | `PRAGMA cache_size`       | About 2 MB per connection | Raise it for big databases         |
+
+PostgreSQL stays at about a quarter because it reads through the OS page cache too, which uses much of the rest. InnoDB usually bypasses the OS cache, so it takes more for itself.
+
+Ask SQLite for its cache size:
+
+```sql
+PRAGMA cache_size;
+```
+
+```text
+-2000
+```
+
+A negative number means kibibytes: `-2000` is about 2 MB. A positive number would mean pages.
+
+<Callout type="info">
+
+In PostgreSQL, `EXPLAIN (ANALYZE, BUFFERS)` shows how many pages a query found in the pool (`shared hit`) and how many it had to read (`read`). It is the quickest way to see whether a slow query is waiting on the disk.
+
+</Callout>
+
+```sql illustration
+-- PostgreSQL: the buffer pool hit ratio across all databases
+SELECT round(100.0 * sum(blks_hit) / sum(blks_hit + blks_read), 2) AS hit_ratio
+FROM pg_stat_database;
+```
+
+## Words to know
+
+<WordsToKnow>
+
+- **Buffer pool**
+  Memory the database manages itself to hold copies of pages from disk.
+- **Clock**
+  An eviction method that sweeps a circle of frames and evicts the first one not used since the last pass.
+- **Dirty page**
+  A page changed in memory but not yet written back to disk.
+- **Eviction**
+  Removing a page from the buffer pool to make room for another.
+- **Frame**
+  One page-sized slot in the buffer pool.
+- **Hit ratio**
+  The share of page requests answered from memory without a disk read.
+- **LRU**
+  Least recently used: evict the page that has gone unused the longest.
+- **Pin**
+  A mark that a page is in use, so it cannot be evicted.
+- **Sequential flooding**
+  A big scan pushing every useful page out of the cache.
+- **Write-back**
+  Saving changed pages to disk later, in one write, instead of at every change.
+
+</WordsToKnow>

@@ -1,0 +1,163 @@
+---
+// A table as the database stores it: the notes grid on top, and below it the file notes.db, one
+// long run of bytes cut into equal 4 KB pages. A mint arrow takes the rows to page 1 (peach);
+// byte offsets under the pages show that page n starts at n × 4096. Below ~520px it scrolls
+// sideways.
+import SvgTable from './SvgTable.astro';
+
+const PAGE_SIZE = 4096;
+const PAGE_COUNT = 4;
+const ROWS_PAGE = 1;
+const STRIP_X = 10;
+const STRIP_Y = 304;
+const PAGE_WIDTH = 152;
+const PAGE_GAP = 4;
+const PAGE_HEIGHT = 56;
+
+const pages = Array.from({ length: PAGE_COUNT }, (_, n) => ({
+	n,
+	x: STRIP_X + n * (PAGE_WIDTH + PAGE_GAP),
+	offset: n === 0 ? 'byte 0' : String(n * PAGE_SIZE),
+}));
+---
+
+<figure class="not-prose my-10">
+	<div
+		class="overflow-x-auto"
+		role="region"
+		aria-label="Table stored as pages diagram"
+		tabindex="0"
+	>
+		<svg
+			viewBox="0 0 640 400"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="tp-title tp-desc"
+		>
+			<title id="tp-title">A table is stored as a file cut into equal pages</title>
+			<desc id="tp-desc">
+				The notes table has three rows: Buy milk, Call Ravi and Book the trek. On disk it lives in
+				the file notes.db, one long run of bytes cut into 4 KB pages: page 0 starts at byte 0, page
+				1 at byte 4096, page 2 at 8192 and page 3 at 12288. The three rows sit in page 1.
+			</desc>
+
+			<SvgTable
+				name="notes"
+				x={10}
+				y={50}
+				width={250}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'body', x: 72, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'Buy milk'],
+					['2', 'Call Ravi'],
+					['3', 'Book the trek'],
+				]}
+				keyTint={{ x: 20, width: 36 }}
+			/>
+
+			<!-- The file: four equal pages side by side -->
+			<text
+				x={STRIP_X + 4}
+				y={STRIP_Y - 14}
+				font-family="var(--font-sans)"
+				font-size="17"
+				font-weight="700"
+				fill="var(--color-ink)">notes.db</text
+			>
+			{
+				pages.map((page) => {
+					const holdsRows = page.n === ROWS_PAGE;
+					return (
+						<g font-family="var(--font-sans)">
+							<rect
+								x={page.x}
+								y={STRIP_Y}
+								width={PAGE_WIDTH}
+								height={PAGE_HEIGHT}
+								rx="10"
+								fill={holdsRows ? 'var(--color-peach)' : 'var(--color-surface)'}
+								fill-opacity={holdsRows ? 0.1 : 1}
+								stroke={holdsRows ? 'var(--color-peach)' : 'none'}
+								stroke-width="2"
+							/>
+							<text
+								x={page.x + 16}
+								y={STRIP_Y + 34}
+								font-size="16"
+								font-weight="600"
+								fill={holdsRows ? 'var(--color-ink)' : 'var(--color-ink-soft)'}
+							>
+								page {page.n}
+							</text>
+							<text
+								x={page.x + PAGE_WIDTH - 16}
+								y={STRIP_Y + 34}
+								text-anchor="end"
+								font-size="14"
+								fill="var(--color-ink-muted)"
+							>
+								4 KB
+							</text>
+							<line
+								x1={page.x}
+								y1={STRIP_Y + PAGE_HEIGHT + 6}
+								x2={page.x}
+								y2={STRIP_Y + PAGE_HEIGHT + 14}
+								stroke="var(--color-gray-600)"
+								stroke-width="2"
+							/>
+							<text
+								x={page.x}
+								y={STRIP_Y + PAGE_HEIGHT + 32}
+								font-family="var(--font-mono)"
+								font-size="13"
+								fill="var(--color-ink-muted)"
+							>
+								{page.offset}
+							</text>
+						</g>
+					);
+				})
+			}
+
+			<!-- The rows end up in page 1 -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M200 252 C 210 268, 228 282, 240 296"></path>
+				<path d="M240 296 l-1.1 -11 M240 296 l-10.7 -2.7"></path>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M440 190 C 446 230, 424 262, 420 296"></path>
+				<path d="M420 296 l-5.3 -9.6 M420 296 l7 -8.5"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="24"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="310" y="150">on disk: one long run</text>
+				<text x="310" y="176">of bytes, cut into pages</text>
+			</g>
+		</svg>
+	</div>
+</figure>

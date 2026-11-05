@@ -1,0 +1,176 @@
+---
+title: The query optimizer
+description: How a database rewrites your query and uses statistics to estimate the cost of each possible plan, then runs the cheapest.
+level: advanced
+order: 18
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A query with three joins and a filter can be run hundreds of different ways. The **optimiser** picks one, in two moves:
+
+1. **Rewrite** the query into a simpler, equivalent form, using fixed rules.
+2. **Cost** the possible plans, using statistics about your data, and keep the cheapest.
+
+## Rewrite rules
+
+These always help, so the optimiser applies them without measuring anything.
+
+| Rule                    | Before                                       | After                                   |
+| ----------------------- | -------------------------------------------- | --------------------------------------- |
+| **Constant folding**    | `WHERE price > 100 * 1.18`                   | `WHERE price > 118.0`                   |
+| Always-false filter     | `WHERE 1 = 0`                                | No rows, so no table read at all        |
+| **Predicate pushdown**  | Join two tables, then filter by country      | Filter by country, then join fewer rows |
+| **Projection pushdown** | Read whole rows, keep two columns at the end | Read only the two columns needed        |
+| **Subquery flattening** | `WHERE id IN (SELECT …)`                     | A join the planner can reorder          |
+
+Predicate pushdown is the one that matters most. Here a filter sits outside a subquery:
+
+```sql illustration
+SELECT *
+FROM (SELECT o.*, c.country FROM orders o JOIN customers c ON c.id = o.customer_id) AS t
+WHERE t.country = 'IN';
+```
+
+Run as written, it joins every order to every customer, then throws most of them away. The optimiser pushes `country = 'IN'` down to `customers`, so only Indian customers reach the join. Same answer, a fraction of the work.
+
+## Cost-based choices
+
+Rules can't decide everything. Should it use the index on `country` or the one on `page`? Which table goes first in the join? For that, the optimiser estimates each plan's **cost**, a made-up unit roughly meaning "pages read plus rows processed", and picks the lowest.
+
+Cost depends on **cardinality**: how many rows each step produces. And cardinality depends on **selectivity**: the fraction of rows a condition keeps.
+
+## Estimating with statistics
+
+Make a table of 10,000 page visits, with an index on each column you'll filter by:
+
+```sql
+CREATE TABLE visits (
+  id INTEGER PRIMARY KEY,
+  page TEXT NOT NULL,
+  country TEXT NOT NULL,
+  visited_on TEXT NOT NULL
+);
+
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10000)
+INSERT INTO visits (page, country, visited_on)
+SELECT
+  '/page/' || (i % 200),
+  CASE WHEN i % 10 < 7 THEN 'IN' WHEN i % 10 < 9 THEN 'US' ELSE 'FR' END,
+  date('2026-01-01', '+' || (i % 300) || ' days')
+FROM n;
+
+CREATE INDEX idx_visits_country ON visits (country);
+CREATE INDEX idx_visits_page ON visits (page);
+```
+
+`ANALYZE` gathers statistics. SQLite stores them in a table called `sqlite_stat1`:
+
+```sql
+ANALYZE;
+
+SELECT * FROM sqlite_stat1 WHERE tbl = 'visits';
+```
+
+```text
+tbl     idx                 stat
+visits  idx_visits_page     10000 50
+visits  idx_visits_country  10000 3334
+```
+
+The first number is the row count. The second is the average number of rows per distinct value: 200 pages means 50 rows each, 3 countries means about 3,334 each.
+
+Now the arithmetic for `WHERE country = 'IN' AND page = '/page/3'`:
+
+```text
+selectivity(page = ?)     = 1 / 200 = 0.005   →  10,000 × 0.005 = 50 rows
+selectivity(country = ?)  = 1 / 3   ≈ 0.333   →  10,000 × 0.333 ≈ 3,334 rows
+both, assumed independent = 0.005 × 0.333     →  10,000 × 0.00167 ≈ 17 rows
+```
+
+The `page` index narrows to 50 rows, the `country` index to 3,334, so the optimiser uses `page`:
+
+```sql
+EXPLAIN QUERY PLAN SELECT * FROM visits WHERE country = 'IN' AND page = '/page/3';
+```
+
+```text
+QUERY PLAN
+`--SEARCH visits USING INDEX idx_visits_page (page=?)
+```
+
+## Where estimates go wrong
+
+Check the real numbers:
+
+```sql
+SELECT country, COUNT(*) FROM visits GROUP BY country;
+
+SELECT COUNT(*) FROM visits WHERE country = 'IN' AND page = '/page/3';
+```
+
+Two assumptions broke:
+
+- **Skew.** `IN` has 7,000 rows and `FR` only 1,000, but the average says 3,334 for both. Engines fix this with a list of **most common values** and a **histogram**: the value range cut into buckets holding the same number of rows each. PostgreSQL keeps both for every column. SQLite only does so when built with `SQLITE_ENABLE_STAT4`.
+- **Correlation.** Each page here only ever gets visits from one country, so the real answer is 50 rows, not 17. Optimisers multiply selectivities as if columns were independent. When they aren't (city and postcode, make and model), estimates can be off by a factor of 100 or more. PostgreSQL's `CREATE STATISTICS` can record such links.
+
+A bad estimate leads to a bad plan. If the optimiser expects 10 rows, an index nested loop looks perfect. If 2 million rows actually come out, that's 2 million index lookups where one hash join would have been far faster.
+
+## Join order
+
+With several joins, the order matters as much as the algorithm. The number of possible orders grows as a factorial:
+
+| Tables joined | Orders (left-deep only) |
+| ------------- | ----------------------- |
+| 3             | 6                       |
+| 5             | 120                     |
+| 10            | 3,628,800               |
+
+Each order then has a choice of [join algorithm](/advanced/join-algorithms) per step. So optimisers don't try them all:
+
+- **PostgreSQL** uses dynamic programming, building the best plan for every pair, then every trio, and so on. Above 12 tables (`geqo_threshold`) it switches to a genetic algorithm that searches randomly for a good order.
+- **SQLite** grows a handful of the cheapest partial plans one table at a time and drops the rest.
+
+The goal is a good plan found quickly, not the perfect plan found slowly.
+
+## Keeping statistics fresh
+
+Statistics describe your data at the moment `ANALYZE` ran. After a big import, they lie.
+
+| Engine     | How statistics are refreshed                                        |
+| ---------- | ------------------------------------------------------------------- |
+| PostgreSQL | Autovacuum runs `ANALYZE` once about 10% of a table's rows change   |
+| MySQL      | InnoDB recalculates once about 10% of a table's rows change         |
+| SQLite     | Never on its own. Run `PRAGMA optimize` before closing a connection |
+
+<Callout type="warning">
+
+After a bulk load or a large delete, run `ANALYZE` yourself. A plan that was fast yesterday turning slow today, with no code change, is very often stale statistics.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **ANALYZE**
+  A command that scans tables and saves statistics for the optimiser.
+- **Cardinality**
+  The number of rows a step of a plan produces.
+- **Constant folding**
+  Working out constant expressions once, before the query runs.
+- **Cost**
+  The optimiser's estimate of how much work a plan takes.
+- **Histogram**
+  Statistics that split a column's values into buckets, to estimate how many rows a range matches.
+- **Predicate pushdown**
+  Moving a filter as close to the table as possible, so later steps see fewer rows.
+- **Selectivity**
+  The fraction of rows a condition keeps, from 0 to 1.
+- **Skew**
+  When some values are far more common than others.
+- **Statistics**
+  Facts the database keeps about its data, such as row counts and distinct values.
+
+</WordsToKnow>

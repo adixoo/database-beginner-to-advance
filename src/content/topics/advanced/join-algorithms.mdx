@@ -1,0 +1,182 @@
+---
+title: Join algorithms
+description: How a database actually matches rows in a join, using a nested loop, a hash join or a sort-merge join, and when each one wins.
+level: advanced
+order: 17
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A [join](/beginner/joins) says which rows belong together. It doesn't say how to find them. The planner picks one of three algorithms, and the choice can make the same query take a millisecond or a minute.
+
+In the examples, `R` is the table read first (the **outer** side) and `S` is the other (the **inner** side). Say `R` has 10,000 rows and `S` has 50,000.
+
+## Nested loop join
+
+The simplest idea: for every row of `R`, check every row of `S`.
+
+```python illustration
+for r in R:                 # 10,000 times
+    for s in S:             # 50,000 times each
+        if r.id == s.r_id:
+            emit(r, s)
+```
+
+That's 10,000 × 50,000 = **500 million** comparisons. Fine for tiny tables, hopeless for big ones.
+
+### Index nested loop
+
+Add an index on `S.r_id`, and the inner loop becomes a lookup instead of a scan:
+
+```python illustration
+for r in R:                           # 10,000 times
+    for s in index_on_S.find(r.id):   # 3 or 4 page reads down a B+ tree
+        emit(r, s)
+```
+
+Now it's about 10,000 × 4 = **40,000** page reads. This is the workhorse of OLTP databases: when the outer side is small, such as one customer's orders, nothing beats it. It also handles any join condition, including `<`, `BETWEEN` and `LIKE`.
+
+## Hash join
+
+With no useful index, build one on the fly, in memory:
+
+```text
+1. Build:  read R, put each row in a hash table keyed on R.id      10,000 rows
+2. Probe:  read S, look up S.r_id in the hash table for matches   50,000 rows
+```
+
+Each row is read once: about **60,000** steps instead of 500 million. The planner builds on the **smaller** side, because the whole hash table must fit in memory.
+
+Two limits:
+
+- It only works for **equality** joins (`=`). A hash can't answer "less than".
+- Nothing comes out until the build side is fully read: the build is a blocking step.
+
+### When the hash table doesn't fit
+
+If the build side is bigger than the memory allowed (`work_mem` in PostgreSQL), the database **spills** to disk. It splits both sides into partitions by hash value, writes them out, and joins one partition pair at a time. This is a **grace hash join**. It still works, but every row is now written and read again, so it's several times slower.
+
+<Callout type="warning">
+
+In PostgreSQL's `EXPLAIN ANALYZE`, a hash node showing `Batches: 8` instead of `Batches: 1` means the join spilled to disk. Raising `work_mem` for that query, or filtering earlier, usually fixes it.
+
+</Callout>
+
+## Sort-merge join
+
+Sort both sides on the join key, then walk them together like a zip:
+
+```text
+R sorted:  1   2   2   5   7
+           ↓   ↓       ↓
+S sorted:  1   2   3   5   5   8
+```
+
+Advance whichever side has the smaller key; when the keys match, emit the pair. The merge is a single pass over each side. The expensive part is the sorting, unless the rows already come out sorted, for example from an index on the join key. Then merge join is very cheap and uses almost no memory.
+
+## Which one wins
+
+| Algorithm         | Join conditions | Memory          | Best when                                              |
+| ----------------- | --------------- | --------------- | ------------------------------------------------------ |
+| Nested loop       | Any             | Almost none     | Both sides are tiny                                    |
+| Index nested loop | Any indexed one | Almost none     | The outer side is small and the inner side is indexed  |
+| Hash join         | `=` only        | Smaller side    | Big tables, no useful index, the smaller side fits RAM |
+| Sort-merge join   | `=`, ranges     | Sorting buffers | Both sides already sorted, or the output must be too   |
+
+Engines differ in what they offer:
+
+| Engine     | Nested loop | Hash join    | Merge join |
+| ---------- | ----------- | ------------ | ---------- |
+| PostgreSQL | Yes         | Yes          | Yes        |
+| SQL Server | Yes         | Yes          | Yes        |
+| MySQL      | Yes         | Since 8.0.18 | No         |
+| SQLite     | Yes         | No           | No         |
+
+## See it in SQLite
+
+SQLite only does nested loops, but it is clever about the inner side. Create two tables:
+
+```sql
+CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE titles (
+  id INTEGER PRIMARY KEY,
+  author_id INTEGER NOT NULL REFERENCES authors (id),
+  title TEXT NOT NULL
+);
+
+INSERT INTO authors (name) VALUES ('Orwell'), ('Tolkien'), ('Achebe');
+INSERT INTO titles (author_id, title)
+VALUES (1, 'Animal Farm'), (1, 'Nineteen Eighty-Four'), (2, 'The Hobbit'), (3, 'Things Fall Apart');
+
+EXPLAIN QUERY PLAN
+SELECT a.name, t.title FROM authors AS a JOIN titles AS t ON t.author_id = a.id;
+```
+
+```text
+QUERY PLAN
+|--SCAN t
+`--SEARCH a USING INTEGER PRIMARY KEY (rowid=?)
+```
+
+SQLite swapped the tables: it scans `titles` on the outside and looks each author up by primary key. That's an index nested loop. `CROSS JOIN` tells SQLite to keep the order you wrote, so `authors` stays outside:
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT a.name, t.title FROM authors AS a CROSS JOIN titles AS t ON t.author_id = a.id;
+```
+
+```text
+QUERY PLAN
+|--SCAN a
+|--BLOOM FILTER ON t (author_id=?)
+`--SEARCH t USING AUTOMATIC COVERING INDEX (author_id=?)
+```
+
+With no index on `titles.author_id`, SQLite builds a temporary one just for this query, an **automatic index**. That's the same idea as a hash join's build step: spend one pass making a lookup structure, then probe it. The **Bloom filter** lets it skip lookups for keys that can't be there. Give it a real index and the trick isn't needed:
+
+```sql
+CREATE INDEX idx_titles_author_id ON titles (author_id);
+
+EXPLAIN QUERY PLAN
+SELECT a.name, t.title
+FROM authors AS a JOIN titles AS t ON t.author_id = a.id
+WHERE a.name = 'Orwell';
+```
+
+```text
+QUERY PLAN
+|--SCAN a
+`--SEARCH t USING INDEX idx_titles_author_id (author_id=?)
+```
+
+<Callout type="info">
+
+An automatic index in a plan is a hint: SQLite thinks this query needs an index you haven't made. If the query runs often, create it yourself so it isn't rebuilt on every run.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Automatic index**
+  A temporary index SQLite builds for one query when no suitable index exists.
+- **Build side**
+  The input a hash join reads first and puts into a hash table, usually the smaller one.
+- **Grace hash join**
+  A hash join that splits both inputs into partitions on disk when the hash table won't fit in memory.
+- **Hash join**
+  A join that puts one input in a hash table, then looks up each row of the other input in it.
+- **Index nested loop join**
+  A nested loop join that finds inner rows with an index lookup instead of a scan.
+- **Nested loop join**
+  A join that checks every row of one input against the rows of the other.
+- **Probe side**
+  The input a hash join reads second, looking each row up in the hash table.
+- **Sort-merge join**
+  A join that sorts both inputs on the join key, then walks them together in one pass.
+- **Spill**
+  Writing intermediate data to disk because it no longer fits in the memory allowed.
+
+</WordsToKnow>

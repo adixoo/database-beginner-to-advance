@@ -1,0 +1,243 @@
+---
+title: Reading EXPLAIN plans
+description: Read the plan a database chooses for your query in SQLite, PostgreSQL and MySQL, and use it to find and fix a slow query.
+level: advanced
+order: 19
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+`EXPLAIN` shows the plan the [optimiser](/advanced/query-optimizer) chose, without running the query. It's the first thing to look at when a query is slow: it tells you whether an index was used, which table drives the join, and where sorting happens.
+
+Make a shop with 1,000 customers and 50,000 orders to practise on:
+
+```sql
+CREATE TABLE shop_customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL, city TEXT NOT NULL);
+CREATE TABLE shop_orders (
+  id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES shop_customers (id),
+  total INTEGER NOT NULL,
+  placed_on TEXT NOT NULL
+);
+
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000)
+INSERT INTO shop_customers (name, city)
+SELECT 'Customer ' || i,
+  CASE i % 4 WHEN 0 THEN 'Delhi' WHEN 1 THEN 'Pune' WHEN 2 THEN 'Kochi' ELSE 'Jaipur' END
+FROM n;
+
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 50000)
+INSERT INTO shop_orders (customer_id, total, placed_on)
+SELECT 1 + (i * 7) % 1000, 100 + (i * 37) % 4900, date('2026-01-01', '+' || (i % 300) || ' days')
+FROM n;
+```
+
+## SQLite: EXPLAIN QUERY PLAN
+
+Each line is one step. Lines at the same depth are nested loops: the **first** one is the outer loop.
+
+| You see                               | It means                                               |
+| ------------------------------------- | ------------------------------------------------------ |
+| `SCAN t`                              | Reads every row of `t`                                 |
+| `SEARCH t USING INDEX i (col=?)`      | Jumps into index `i`, then fetches each matching row   |
+| `SEARCH t USING COVERING INDEX i`     | Answers from the index alone, never touching the table |
+| `USING INTEGER PRIMARY KEY (rowid=?)` | Looks a row up directly by its id                      |
+| `USE TEMP B-TREE FOR ORDER BY`        | Sorts the results; same for `GROUP BY` and `DISTINCT`  |
+| `AUTOMATIC INDEX`                     | Builds a temporary index for this query only           |
+| `LIST SUBQUERY` / `CORRELATED …`      | Runs a subquery once, or once per outer row            |
+
+## Fix a slow query, step by step
+
+The app shows one customer's orders, newest first:
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT id, total FROM shop_orders WHERE customer_id = 42 ORDER BY placed_on DESC;
+```
+
+```text
+QUERY PLAN
+|--SCAN shop_orders
+`--USE TEMP B-TREE FOR ORDER BY
+```
+
+Two problems: it reads all 50,000 orders to find 50, then sorts them. Index the filter column:
+
+```sql
+CREATE INDEX idx_shop_orders_customer ON shop_orders (customer_id);
+
+EXPLAIN QUERY PLAN
+SELECT id, total FROM shop_orders WHERE customer_id = 42 ORDER BY placed_on DESC;
+```
+
+```text
+QUERY PLAN
+|--SEARCH shop_orders USING INDEX idx_shop_orders_customer (customer_id=?)
+`--USE TEMP B-TREE FOR ORDER BY
+```
+
+The scan is gone; the sort is still there, but now it's only 50 rows. Put the sort column in the index too, and the rows come out of the index already in order:
+
+```sql
+CREATE INDEX idx_shop_orders_customer_placed ON shop_orders (customer_id, placed_on);
+
+EXPLAIN QUERY PLAN
+SELECT id, total FROM shop_orders WHERE customer_id = 42 ORDER BY placed_on DESC;
+```
+
+```text
+QUERY PLAN
+`--SEARCH shop_orders USING INDEX idx_shop_orders_customer_placed (customer_id=?)
+```
+
+No sort at all: SQLite reads that part of the index backwards for `DESC`. If the query only needs columns that are in the index, it doesn't even visit the table:
+
+```sql
+EXPLAIN QUERY PLAN SELECT placed_on FROM shop_orders WHERE customer_id = 42;
+```
+
+```text
+QUERY PLAN
+`--SEARCH shop_orders USING COVERING INDEX idx_shop_orders_customer_placed (customer_id=?)
+```
+
+<Callout type="info">
+
+The first index is now redundant: `(customer_id, placed_on)` can do everything `(customer_id)` can, because an index can be searched by its leading columns. Dropping it saves space and speeds up writes. [Choosing indexes well](/advanced/choosing-indexes) covers this.
+
+</Callout>
+
+A join with a total per city shows the outer loop, the lookup and the grouping step:
+
+```sql
+EXPLAIN QUERY PLAN
+SELECT c.city, SUM(o.total)
+FROM shop_customers AS c JOIN shop_orders AS o ON o.customer_id = c.id
+GROUP BY c.city;
+```
+
+```text
+QUERY PLAN
+|--SCAN o
+|--SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+`--USE TEMP B-TREE FOR GROUP BY
+```
+
+SQLite's plan never shows row counts or timings. PostgreSQL's does.
+
+## PostgreSQL: EXPLAIN ANALYZE
+
+`EXPLAIN` alone shows estimates. `EXPLAIN (ANALYZE, BUFFERS)` **runs** the query and adds what really happened. Here is the first slow query on the same data in PostgreSQL:
+
+```sql illustration
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id, total FROM shop_orders WHERE customer_id = 42 ORDER BY placed_on DESC;
+```
+
+```text
+Sort  (cost=966.11..966.24 rows=50 width=19) (actual time=6.871..6.875 rows=50 loops=1)
+  Sort Key: placed_on DESC
+  Sort Method: quicksort  Memory: 28kB
+  Buffers: shared hit=340
+  ->  Seq Scan on shop_orders  (cost=0.00..965.00 rows=50 width=19) (actual time=0.019..6.822 rows=50 loops=1)
+        Filter: (customer_id = 42)
+        Rows Removed by Filter: 49950
+        Buffers: shared hit=340
+Planning Time: 0.080 ms
+Execution Time: 6.901 ms
+```
+
+Read it **inside out**: the most indented node runs first and feeds its parent. Each node has two brackets:
+
+| Part                       | Means                                                              |
+| -------------------------- | ------------------------------------------------------------------ |
+| `cost=0.00..965.00`        | Estimated cost before the first row comes out, and for all rows    |
+| `rows=50 width=19`         | Estimated rows out, and their average size in bytes                |
+| `actual time=0.019..6.822` | Real milliseconds to the first row, and to the last                |
+| `rows=50 loops=1`          | Real rows out **per loop**, and how many times the node ran        |
+| `Rows Removed by Filter`   | Rows read and thrown away: 49,950 here, a sign an index is missing |
+| `Buffers: shared hit=340`  | Pages found in memory (`hit`) or read from disk (`read`)           |
+
+After adding the `(customer_id, placed_on)` index:
+
+```text
+Index Scan Backward using idx_shop_orders_customer_placed on shop_orders  (cost=0.29..52.16 rows=50 width=19) (actual time=0.021..0.064 rows=50 loops=1)
+  Index Cond: (customer_id = 42)
+  Buffers: shared hit=52
+Planning Time: 0.095 ms
+Execution Time: 0.081 ms
+```
+
+340 pages became 52, and 6.9 ms became 0.08 ms. In a join, watch `loops`. Here the inner index scan ran once for each of 250 customers in Pune, returning 5 rows each time, so 1,250 rows in total:
+
+```text
+Nested Loop  (cost=0.29..1102.50 rows=1275 width=17) (actual time=0.040..4.210 rows=1250 loops=1)
+  ->  Seq Scan on shop_customers c  (cost=0.00..21.50 rows=250 width=13) (actual time=0.010..0.180 rows=250 loops=1)
+        Filter: (city = 'Pune'::text)
+        Rows Removed by Filter: 750
+  ->  Index Scan using idx_shop_orders_customer on shop_orders o  (cost=0.29..4.33 rows=5 width=8) (actual time=0.004..0.015 rows=5 loops=250)
+        Index Cond: (customer_id = c.id)
+        Filter: (total > 4500)
+        Rows Removed by Filter: 45
+```
+
+The node names you'll meet most:
+
+| Node                                     | What it does                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Seq Scan`                               | Reads the whole table                                                                 |
+| `Index Scan`                             | Walks an index, fetching each matching row from the table                             |
+| `Index Only Scan`                        | Answers from the index alone, like SQLite's covering index                            |
+| `Bitmap Index Scan` + `Bitmap Heap Scan` | Collects matching row locations first, then reads the table pages in order, each once |
+| `Nested Loop`, `Hash Join`, `Merge Join` | The three [join algorithms](/advanced/join-algorithms)                                |
+| `Sort`, `HashAggregate`                  | Sorting, and `GROUP BY` with a hash table                                             |
+
+What to look for, in order:
+
+1. **Estimated vs actual rows** that differ by 10× or more. The plan was built on a wrong guess; run `ANALYZE` or check for correlated columns.
+2. **Large `Rows Removed by Filter`** on a `Seq Scan`: a missing index.
+3. **`Sort Method: external merge  Disk: …`** or a hash with **`Batches`** above 1: the step spilled to disk.
+4. **A big `loops` count** under a nested loop: the inner side runs too often.
+
+<Callout type="danger">
+
+`EXPLAIN ANALYZE` really runs the statement. On an `UPDATE` or `DELETE`, wrap it in `BEGIN; … ROLLBACK;` or the rows really change.
+
+</Callout>
+
+## MySQL: the type column
+
+MySQL's `EXPLAIN` prints one row per table. The `type` column tells you how each table is read, best to worst:
+
+| `type`   | Means                                              |
+| -------- | -------------------------------------------------- |
+| `const`  | At most one row, by primary key or unique index    |
+| `eq_ref` | One row per outer row in a join, by a unique index |
+| `ref`    | Several rows by a non-unique index                 |
+| `range`  | A range of an index, such as `BETWEEN` or `>`      |
+| `index`  | The whole index, start to finish                   |
+| `ALL`    | The whole table                                    |
+
+In the `Extra` column, `Using filesort` is a sort step, `Using temporary` a temporary table, and `Using index` a covering index. Since MySQL 8.0.18, `EXPLAIN ANALYZE` prints a tree with real times, much like PostgreSQL's.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Covering index**
+  An index that holds every column a query needs, so the table is never read.
+- **EXPLAIN**
+  Shows the plan the database will use for a query, without running it.
+- **EXPLAIN ANALYZE**
+  Runs the query and shows the plan with real row counts and timings.
+- **Loops**
+  How many times a plan node ran, usually once per row of the outer side of a join.
+- **Rows Removed by Filter**
+  Rows a PostgreSQL node read and then discarded because they failed a condition.
+- **Startup cost**
+  The estimated cost before a node returns its first row.
+- **Temp B-tree**
+  A temporary sorted structure SQLite builds to sort or group rows.
+
+</WordsToKnow>

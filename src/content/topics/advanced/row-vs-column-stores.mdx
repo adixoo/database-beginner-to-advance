@@ -1,0 +1,141 @@
+---
+title: Row stores vs column stores
+description: A row store keeps each row together for fast lookups and updates, while a column store keeps each column together for fast analytics.
+level: advanced
+order: 27
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Every database so far stores a row's values next to each other on a page (see [How rows are stored](/advanced/how-rows-are-stored)). That is a **row store**. A **column store** turns this sideways and keeps all values of one column together. Same data, very different strengths.
+
+## Two kinds of work
+
+| Workload | Stands for                    | Typical query                                              | Example                        |
+| -------- | ----------------------------- | ---------------------------------------------------------- | ------------------------------ |
+| OLTP     | Online transaction processing | Read or change a few whole rows, fast, many times a second | Place an order, load a profile |
+| OLAP     | Online analytical processing  | Read a few columns of millions of rows and sum them        | Revenue per country per month  |
+
+Your app's database is OLTP. Dashboards and reports are OLAP.
+
+## The two layouts
+
+Take an `orders` table with 5 columns:
+
+```text
+Row store: one row after another
+┌────────────────────────────────────────────────────────────┐
+│ 1,Asha,IN,2026-11-01,499 │ 2,Ravi,IN,2026-11-01,120 │ 3,Meera,NP,… │
+└────────────────────────────────────────────────────────────┘
+
+Column store: one column after another
+id:       │ 1      │ 2      │ 3      │ …
+customer: │ Asha   │ Ravi   │ Meera  │ …
+country:  │ IN     │ IN     │ NP     │ …
+date:     │ 11-01  │ 11-01  │ 11-01  │ …
+amount:   │ 499    │ 120    │ 75     │ …
+```
+
+Now ask for total sales per country:
+
+```sql illustration
+SELECT country, sum(amount) FROM orders GROUP BY country;
+```
+
+The query needs 2 of the 5 columns. A row store must read every page, so it reads all 5 columns of every row. A column store reads only `country` and `amount`. With 100 columns and a query that touches 3, that is about 33 times fewer bytes from disk.
+
+The reverse is also true. Fetching order 2 in full is one page read in a row store, but in a column store it means one read **per column** to stitch the row back together. Inserting one row means writing to every column file.
+
+## Compression
+
+A column holds one type of value, often repeated or sorted, so it compresses far better than mixed rows. Common tricks:
+
+| Technique           | Idea                                              | Example                                                    |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| Dictionary encoding | Replace repeated strings with small integer codes | `IN, IN, NP` → dictionary `{0: IN, 1: NP}`, data `0, 0, 1` |
+| Run-length encoding | Store a value and how many times it repeats       | `IN ×4,000, NP ×900`                                       |
+| Delta encoding      | Store the difference from the previous value      | `1000, 1001, 1003` → `1000, +1, +2`                        |
+| Bit packing         | Use only as many bits as the largest value needs  | Codes 0-7 fit in 3 bits instead of 32                      |
+
+These stack: dictionary-encode a `country` column, sort it, run-length encode the codes, then bit-pack. A 10:1 compression ratio is ordinary. Smaller data also means more of it fits in memory and in the CPU cache.
+
+## Vectorized execution
+
+A row store's executor usually handles one row at a time (the iterator model in [How a query runs](/advanced/how-a-query-runs)): call `next()`, get one row, check it, repeat. For a billion rows, the per-call overhead dominates.
+
+Column stores use **vectorized execution**: each operator works on a **batch** of values, often 1,024 or 2,048 from one column, in a tight loop:
+
+```text
+amount batch: [499, 120, 75, 310, …]  ──▶ filter > 100 ──▶ [499, 120, 310, …]
+```
+
+Tight loops over plain arrays let the CPU use **SIMD** instructions, which compare or add 4, 8 or 16 values in a single instruction, and keep the data in cache.
+
+**Late materialization** goes further: filter on one column first, keep a list of matching positions, and fetch the other columns only for those positions. Rows that fail the filter are never assembled at all.
+
+## Trade-offs
+
+|                                | Row store              | Column store                                  |
+| ------------------------------ | ---------------------- | --------------------------------------------- |
+| Fetch one whole row            | Fast: one page         | Slow: one read per column                     |
+| Insert or update one row       | Fast                   | Slow; usually buffered and written in batches |
+| Scan a few columns of all rows | Slow: reads everything | Fast: reads only those columns                |
+| Compression                    | Modest                 | High, often 5-10× or more                     |
+| Best for                       | OLTP                   | OLAP                                          |
+
+## Real systems
+
+| Kind                | Systems                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| Row stores          | PostgreSQL, MySQL (InnoDB), SQLite, SQL Server, Oracle                                         |
+| Column stores       | DuckDB (embedded, like SQLite for analytics), ClickHouse, Snowflake, BigQuery, Amazon Redshift |
+| Column file formats | Parquet and ORC: columnar files that DuckDB, Spark and others query directly                   |
+
+DuckDB can query a Parquet file with no loading step:
+
+```sql illustration
+-- DuckDB
+SELECT country, sum(amount)
+FROM 'orders_2026.parquet'
+GROUP BY country;
+```
+
+<Callout type="info">
+
+Many systems mix both. SQL Server has columnstore indexes, PostgreSQL has columnar extensions, and **HTAP** databases such as TiDB (TiKV rows plus TiFlash columns) keep a row copy for transactions and a column copy for analytics, kept in sync by replication.
+
+</Callout>
+
+The usual pattern: run the app on a row store, and copy its data (nightly, or continuously via change data capture) into a column store for analytics.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Bit packing**
+  Storing small integers in only as many bits as they need.
+- **Column store**
+  A database that stores each column's values together.
+- **Delta encoding**
+  Storing each value as its difference from the previous one.
+- **Dictionary encoding**
+  Replacing repeated values with small integer codes.
+- **HTAP**
+  Hybrid transactional and analytical processing: one system for both OLTP and OLAP.
+- **Late materialization**
+  Assembling full rows only for the values that pass the filters.
+- **OLAP**
+  Analytical work: scanning and aggregating many rows.
+- **OLTP**
+  Transactional work: reading and changing a few rows at a time.
+- **Row store**
+  A database that stores each row's values together.
+- **Run-length encoding**
+  Storing a repeated value once with a count.
+- **SIMD**
+  Single instruction, multiple data: one CPU instruction that works on several values at once.
+- **Vectorized execution**
+  Running each operator on a batch of values at a time instead of one row.
+
+</WordsToKnow>

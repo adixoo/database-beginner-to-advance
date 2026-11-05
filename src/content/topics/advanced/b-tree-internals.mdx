@@ -1,0 +1,190 @@
+---
+title: B+ tree internals
+description: How a B+ tree keeps billions of keys three or four page reads away, and what happens inside it when you insert, delete and scan a range.
+level: advanced
+order: 11
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Almost every index you create, and in many engines the table itself, is a **B+ tree**. In [Indexes](/beginner/indexes) it was "a sorted list the database can jump into". This topic opens it up.
+
+## Why not a binary tree
+
+A binary search tree has two children per node. For a billion keys that is about 30 levels (2³⁰ ≈ 1 billion). On disk, every level is a separate random read, and a random read is the most expensive thing a database does (see [Disk I/O and fsync](/advanced/disk-io-and-fsync)). Thirty reads per lookup is far too many.
+
+The fix is to make each node as big as a [page](/advanced/how-rows-are-stored) and pack hundreds of keys into it. One read then brings in hundreds of choices instead of two, and the tree becomes very short and very wide.
+
+## Nodes are pages
+
+A B+ tree has two kinds of node, and each one is a single page (4 KB in SQLite by default, 8 KB in PostgreSQL, 16 KB in MySQL's InnoDB):
+
+- **Internal nodes** hold only separator keys and pointers to child pages. They are signposts.
+- **Leaf nodes** hold every key, in order, with either the row itself or a pointer to it. Each leaf also points to the next leaf.
+
+```text
+                       [ 40 | 80 ]                      <- root (internal)
+                /           |            \
+     [ 10 | 20 | 30 ]  [ 50 | 60 | 70 ]  [ 90 | 95 ]     <- internal
+       /  |   |   \       ...                ...
+ [1..9] [10..19] [20..29] [30..39] -> [40..49] -> ...    <- leaves, linked left to right
+```
+
+Every leaf sits at the same depth. That is the "balanced" in balanced tree: no lookup is ever luckier or unluckier than another.
+
+## Fanout: why three or four levels is enough
+
+**Fanout** is how many children an internal node has. An 8 KB page holding 8-byte keys plus a 6-byte child pointer and a little overhead fits roughly 400 to 500 entries. Take 500:
+
+| Levels | Leaf pages reachable | Keys (about 400 per leaf) |
+| -----: | -------------------: | ------------------------: |
+|      1 |                    1 |                       400 |
+|      2 |                  500 |                   200,000 |
+|      3 |              250,000 |               100 million |
+|      4 |          125 million |                50 billion |
+
+Four levels cover 50 billion keys. Better still, the top two levels are only 501 pages, about 4 MB, so they stay in the [buffer pool](/advanced/buffer-pool) all the time. A lookup in a huge table usually costs one or two actual disk reads.
+
+Wide keys lower the fanout. A 100-byte text key fits about 70 per page instead of 500, so the tree gets a level taller sooner. That is one reason short keys make faster indexes.
+
+## Search: walk down, then read the leaf
+
+To find key 63:
+
+1. Read the root. 63 is between 40 and 80, so follow the middle pointer.
+2. Read that internal node. 63 is between 60 and 70, so follow that pointer.
+3. Read the leaf, and binary-search inside the page for 63.
+
+Inside a page the search is in memory and takes nanoseconds. What costs time is the number of pages read, which equals the height of the tree.
+
+## Insert and node split
+
+A new key always goes into the leaf where it belongs in sorted order. If the leaf has room, that is the whole job. If it is full, the leaf **splits**:
+
+```text
+Insert 25 into a full leaf:
+
+  before:  [ 20 | 21 | 23 | 24 ]                (full)
+
+  after:   [ 20 | 21 ]  ->  [ 23 | 24 | 25 ]
+                 \             /
+       parent gains separator 23
+```
+
+1. Allocate a new page and move the upper half of the keys into it.
+2. Insert a separator key for the new page into the parent.
+3. If the parent is now full, split it too, and so on upwards.
+4. If the root splits, make a new root above it. The tree grows one level taller.
+
+A B+ tree grows at the top, never at the bottom, which is why all leaves stay at the same depth.
+
+<Callout type="info">
+
+Insert order matters. Increasing keys, such as an auto-increment `id`, always land in the rightmost leaf, so pages fill up completely and splits are cheap; PostgreSQL and SQLite have fast paths for this. Random keys, such as UUIDv4, land all over the tree: pages end up half to three-quarters full, splits happen everywhere, and the working set no longer fits in cache. Time-ordered IDs like UUIDv7 avoid this.
+
+</Callout>
+
+## Delete, underflow and merge
+
+Deleting removes the key from its leaf. In the textbook version, a node that drops below half full has **underflowed**: it borrows a key from a sibling, or merges with it and removes one separator from the parent. Merges can travel up just like splits, and the root can disappear, making the tree one level shorter.
+
+Real engines are lazier. Merging costs writes and locking, and the space is often refilled soon anyway:
+
+| Engine     | What happens to a page that empties out                                      |
+| ---------- | ---------------------------------------------------------------------------- |
+| PostgreSQL | Only completely empty pages are removed, later, by `VACUUM`                  |
+| InnoDB     | Merges with a neighbour once a page falls below 50% full (`MERGE_THRESHOLD`) |
+| SQLite     | Rebalances siblings on delete; freed pages go on a free list for reuse       |
+
+This is why an index can stay large after you delete most of a table, until you rebuild it with `REINDEX` (PostgreSQL, SQLite) or `OPTIMIZE TABLE` (MySQL).
+
+## Linked leaves make range scans cheap
+
+Because leaves are chained in key order, a range query walks down once to the first match and then follows the chain sideways, reading leaf after leaf until it passes the end of the range. No trip back to the root. The same chain gives `ORDER BY` for free: the rows already come out sorted.
+
+Try it with a table of sensor readings:
+
+```sql
+CREATE TABLE readings (
+  id INTEGER PRIMARY KEY,
+  sensor_id INTEGER NOT NULL,
+  taken_at TEXT NOT NULL,
+  celsius REAL NOT NULL
+);
+
+INSERT INTO readings (sensor_id, taken_at, celsius)
+WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10000)
+SELECT i % 50, datetime('2026-01-01', '+' || i || ' minutes'), 15 + (i % 20)
+FROM n;
+
+EXPLAIN QUERY PLAN
+SELECT * FROM readings WHERE taken_at BETWEEN '2026-01-02' AND '2026-01-03';
+```
+
+```text
+QUERY PLAN
+`--SCAN readings
+```
+
+No index on `taken_at`, so SQLite reads all 10,000 rows. Add one and ask again:
+
+```sql
+CREATE INDEX idx_readings_taken_at ON readings (taken_at);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM readings WHERE taken_at BETWEEN '2026-01-02' AND '2026-01-03'
+ORDER BY taken_at;
+```
+
+```text
+QUERY PLAN
+`--SEARCH readings USING INDEX idx_readings_taken_at (taken_at>? AND taken_at<?)
+```
+
+One walk down to `2026-01-02`, then along the leaves to `2026-01-03`. There is no `USE TEMP B-TREE FOR ORDER BY` line either: the index already returns the rows in order.
+
+## Clustered and secondary indexes
+
+Where the row itself lives depends on the engine:
+
+| Engine     | Table storage                                  | A secondary index leaf holds              |
+| ---------- | ---------------------------------------------- | ----------------------------------------- |
+| SQLite     | A B+ tree keyed by `rowid` (the integer key)   | The indexed value plus the `rowid`        |
+| InnoDB     | A B+ tree keyed by the primary key (clustered) | The indexed value plus the primary key    |
+| PostgreSQL | A heap: pages in no particular order           | The indexed value plus a TID (page, slot) |
+
+In a **clustered** layout (SQLite, InnoDB), the table _is_ the primary key's B+ tree: rows sit in its leaves, sorted by key. A primary key lookup is one walk. A secondary index lookup is two walks: one through the secondary index to find the primary key, then one through the table's tree to find the row.
+
+In PostgreSQL's **heap** layout, every index, primary key included, points straight at a physical spot in the heap. That makes all indexes equal, but when a row moves to a new spot (see [MVCC](/advanced/mvcc)), indexes may need new entries too.
+
+<Callout type="warning">
+
+In InnoDB every secondary index carries a copy of the primary key. A wide primary key, such as a 36-character UUID string, makes every other index wider and shallower in fanout. Keep clustered keys short.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **B+ tree**
+  A balanced tree of pages where internal nodes hold only signposts and every key lives in a linked chain of leaves.
+- **Clustered index**
+  An index whose leaves hold the table's rows themselves, so the table is stored in key order.
+- **Fanout**
+  How many children an internal node has; higher fanout means a shorter tree.
+- **Heap**
+  Table storage with rows in no particular order, which indexes point into.
+- **Internal node**
+  A tree page holding separator keys and pointers to child pages, but no rows.
+- **Leaf node**
+  A page at the bottom of the tree holding keys with their rows or row pointers.
+- **Node split**
+  Dividing a full page into two and adding a separator key to its parent.
+- **Secondary index**
+  Any index other than the one the table is stored by; it points back to the row.
+- **Underflow**
+  A node falling below its minimum fill after deletes, which may trigger a merge.
+
+</WordsToKnow>

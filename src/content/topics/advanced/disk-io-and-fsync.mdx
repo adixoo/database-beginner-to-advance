@@ -1,0 +1,157 @@
+---
+title: Disk I/O and fsync
+description: Why random reads are slow, why a finished write may not be on disk yet, and how fsync makes a commit survive a power cut.
+level: advanced
+order: 2
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A database is only as fast as the slowest thing it waits for, and that is almost always the disk. This topic is about what really happens between "save this page" and "it is safe on disk".
+
+## How slow is slow
+
+Rough numbers for one small read on modern hardware:
+
+| Where the data is            | Time to read it | Compared with RAM |
+| ---------------------------- | --------------: | ----------------: |
+| CPU cache                    |           ~1 ns |       100× faster |
+| RAM                          |         ~100 ns |                1× |
+| NVMe SSD, random 4 KB read   |   ~20 to 100 µs |     200 to 1,000× |
+| SATA SSD, random 4 KB read   |         ~100 µs |            1,000× |
+| Hard disk (HDD), random read |     ~5 to 10 ms |         ~100,000× |
+
+If RAM were one second, a random hard-disk read would be over a day. That gap is why databases cache pages in memory ([The buffer pool](/advanced/buffer-pool)) and why they care so much about how they touch the disk.
+
+## Sequential vs random I/O
+
+- **Sequential I/O** reads or writes blocks one after another: block 10, 11, 12...
+- **Random I/O** jumps around: block 10, then 9,000, then 512.
+
+On a hard disk, a random read means moving the arm and waiting for the platter to spin round: about 100 to 200 random reads per second. Reading in order, the same disk streams 150 to 250 MB per second.
+
+SSDs have no moving parts, so random reads are far cheaper, but sequential is still faster: the drive and the OS can read ahead and batch the work.
+
+Database designs follow from this:
+
+- The **write-ahead log** is append-only, so commits are sequential writes ([WAL and crash recovery](/advanced/wal-and-crash-recovery)).
+- **LSM trees** turn random writes into sequential ones ([LSM trees and Bloom filters](/advanced/lsm-trees-and-bloom-filters)).
+- The query planner may prefer reading a whole table in order over thousands of random index lookups ([The query optimizer](/advanced/query-optimizer)).
+
+## The OS page cache
+
+When a program calls `write()`, the data does not go to the disk. The operating system copies it into its own memory, the **page cache**, marks it dirty and returns at once. The kernel writes it to disk later: on Linux, dirty pages are flushed after about 30 seconds by default.
+
+```text
+Database ──write()──▶ OS page cache (RAM) ──later──▶ Disk cache ──▶ Disk
+                       ▲ write() returns here
+```
+
+Reads go through the same cache: a page read recently comes back from RAM, not from the disk.
+
+This is **buffered I/O**, and it is fast. It is also a trap: if the power goes before the kernel flushes, the "written" data is gone.
+
+## fsync: make it durable
+
+`fsync(file)` tells the OS: write every dirty page of this file to the disk, and ask the disk to empty its own cache too. It returns only when the data is on stable storage.
+
+A database calls `fsync` at commit. That is the moment a commit becomes **durable**: before it, a crash can lose the transaction; after it, it survives a power cut.
+
+`fsync` is slow: up to several milliseconds on a hard disk or a cheap SSD, much less on server SSDs with power-loss protection. So a database that fsyncs every commit tops out at a few hundred to a few thousand commits per second per disk, unless it batches.
+
+Batching is easy to see. Each statement outside `BEGIN` is its own transaction, so it pays for its own fsync. Wrap many changes in one transaction and they share one:
+
+```sql
+CREATE TABLE events (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, at TEXT NOT NULL);
+
+BEGIN;
+INSERT INTO events (kind, at) VALUES ('login', '2026-11-05 09:00:00');
+INSERT INTO events (kind, at) VALUES ('view', '2026-11-05 09:00:04');
+INSERT INTO events (kind, at) VALUES ('logout', '2026-11-05 09:12:31');
+COMMIT;
+```
+
+Loading 100,000 rows one commit at a time can take minutes on a real disk; in one transaction it takes about a second. Servers do the same across users with **group commit**: commits that arrive together share one fsync.
+
+<Callout type="warning">
+
+Writing a file safely takes more than one call. To replace a file, apps write a temporary file, fsync it, rename it over the old one, then fsync the folder so the rename itself is saved. Skip a step and a crash can leave an empty or half-written file.
+
+</Callout>
+
+```python illustration
+import os
+
+with open("data.tmp", "wb") as f:
+    f.write(new_bytes)
+    f.flush()
+    os.fsync(f.fileno())           # the file's bytes are on disk
+os.replace("data.tmp", "data")     # atomic rename
+dir_fd = os.open(".", os.O_RDONLY)
+os.fsync(dir_fd)                   # the rename is on disk
+```
+
+## Trading durability for speed
+
+Every engine lets you choose how often to fsync:
+
+| Engine         | Setting                          | Safest (default) | Faster, less safe                       |
+| -------------- | -------------------------------- | ---------------- | --------------------------------------- |
+| SQLite         | `PRAGMA synchronous`             | `FULL`           | `NORMAL`, `OFF`                         |
+| PostgreSQL     | `synchronous_commit`             | `on`             | `off`: may lose the last few hundred ms |
+| MySQL (InnoDB) | `innodb_flush_log_at_trx_commit` | `1`              | `2` or `0`: may lose about 1 second     |
+
+```sql illustration
+-- SQLite in WAL mode: survives an app crash, may lose the last commits on power loss
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+```
+
+None of these corrupt the database; they only risk losing the latest commits. Turning fsync off entirely (PostgreSQL's `fsync = off`) is different: a crash can then corrupt it.
+
+## Direct I/O
+
+**Direct I/O** (`O_DIRECT` on Linux) skips the OS page cache and moves data straight between the database's memory and the disk. A database with its own large cache gains two things: pages are not cached twice, and it decides itself when to write.
+
+- **InnoDB** usually runs with `innodb_flush_method = O_DIRECT`.
+- **PostgreSQL** uses buffered I/O and leans on the OS cache alongside its own.
+- **SQLite** uses buffered I/O.
+
+## Write amplification
+
+Changing one byte never writes one byte. A 10-byte update can turn into:
+
+1. A record in the write-ahead log.
+2. The whole 8 KB page, when it is flushed.
+3. A full copy of the page in the log the first time it changes after a checkpoint (PostgreSQL's `full_page_writes`), or a copy in InnoDB's doublewrite buffer. Both guard against a **torn page**: a page only half written when the power went.
+4. Inside an SSD, a rewrite of a whole erase block, often hundreds of KB.
+
+The ratio of bytes written to bytes changed is the **write amplification**. It costs speed and wears out SSDs, and it is a main reason different storage engines exist.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Buffered I/O**
+  Reads and writes that pass through the operating system's page cache.
+- **Direct I/O**
+  Reads and writes that skip the OS page cache and go straight to the disk.
+- **Durable**
+  Saved so that it survives a crash or power cut.
+- **fsync**
+  A system call that waits until a file's data is really on the disk.
+- **Group commit**
+  Saving several transactions' commits with one shared fsync.
+- **Page cache**
+  Memory the operating system uses to hold recently read and written file pages.
+- **Random I/O**
+  Reading or writing blocks in scattered places on the disk.
+- **Sequential I/O**
+  Reading or writing blocks one after another, in order.
+- **Torn page**
+  A page only partly written when a crash happened.
+- **Write amplification**
+  How many bytes really reach the disk for each byte you changed.
+
+</WordsToKnow>

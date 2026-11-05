@@ -1,0 +1,174 @@
+---
+title: Isolation levels and anomalies
+description: Isolation levels decide how much transactions running at the same time can see of each other, and which strange results, called anomalies, they let through.
+level: advanced
+order: 20
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+The I in [ACID](/beginner/transactions#acid) promises that transactions don't trip over each other. Full isolation is expensive: transactions would have to wait for each other or be thrown away and retried. So databases let you choose an **isolation level**: how much interference you will accept in exchange for speed.
+
+Each step down lets through more **anomalies**: results that could never happen if the transactions had run one after the other.
+
+## The anomalies
+
+Each example shows two sessions, A and B, running at the same time. Read the steps top to bottom.
+
+### Dirty read
+
+A reads a change B has not committed yet, and B then rolls it back. A acted on data that never existed.
+
+| Step | Session A                              | Session B                                       |
+| ---: | -------------------------------------- | ----------------------------------------------- |
+|    1 |                                        | `BEGIN;`                                        |
+|    2 |                                        | `UPDATE accounts SET balance = 0 WHERE id = 1;` |
+|    3 | `SELECT balance ... WHERE id = 1;` → 0 |                                                 |
+|    4 |                                        | `ROLLBACK;`                                     |
+
+A saw a balance of 0. The real balance never changed.
+
+### Non-repeatable read
+
+A reads the same row twice inside one transaction and gets two different answers, because B committed a change in between.
+
+| Step | Session A                                | Session B                                                   |
+| ---: | ---------------------------------------- | ----------------------------------------------------------- |
+|    1 | `BEGIN;`                                 |                                                             |
+|    2 | `SELECT balance ... WHERE id = 1;` → 500 |                                                             |
+|    3 |                                          | `UPDATE accounts SET balance = 300 WHERE id = 1;` (commits) |
+|    4 | `SELECT balance ... WHERE id = 1;` → 300 |                                                             |
+
+### Phantom read
+
+A runs the same search twice and a new row appears, because B inserted a row that matches.
+
+| Step | Session A                                           | Session B                                          |
+| ---: | --------------------------------------------------- | -------------------------------------------------- |
+|    1 | `SELECT count(*) FROM posts WHERE user_id = 1;` → 2 |                                                    |
+|    2 |                                                     | `INSERT INTO posts ... user_id = 1 ...;` (commits) |
+|    3 | `SELECT count(*) FROM posts WHERE user_id = 1;` → 3 |                                                    |
+
+A non-repeatable read changes a row you already saw. A phantom is a row you did not see before.
+
+### Lost update
+
+Both sessions read a value, change it in the app, and write it back. The second write silently wipes out the first.
+
+| Step | Session A                        | Session B                        |
+| ---: | -------------------------------- | -------------------------------- |
+|    1 | `SELECT likes ...;` → 10         |                                  |
+|    2 |                                  | `SELECT likes ...;` → 10         |
+|    3 | `UPDATE ... SET likes = 11 ...;` |                                  |
+|    4 |                                  | `UPDATE ... SET likes = 11 ...;` |
+
+Two likes came in, but the count only went up by one.
+
+### Write skew
+
+Two sessions read the same rows, each changes a **different** row, and together they break a rule neither broke alone.
+
+A hospital rule says at least one doctor must be on call. Asha and Ravi are both on call, and both feel ill:
+
+| Step | Session A (Asha)                                                       | Session B (Ravi)                                                       |
+| ---: | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+|    1 | `SELECT count(*) FROM doctors WHERE on_call;` → 2                      |                                                                        |
+|    2 |                                                                        | `SELECT count(*) FROM doctors WHERE on_call;` → 2                      |
+|    3 | 2 is more than 1, so `UPDATE ... on_call = false WHERE name = 'Asha';` |                                                                        |
+|    4 |                                                                        | 2 is more than 1, so `UPDATE ... on_call = false WHERE name = 'Ravi';` |
+|    5 | `COMMIT;`                                                              | `COMMIT;`                                                              |
+
+No two writes touched the same row, so nothing conflicted. Yet now nobody is on call.
+
+## The four standard levels
+
+The SQL standard defines four levels by which anomalies they forbid:
+
+| Level            | Dirty read | Non-repeatable read | Phantom read |
+| ---------------- | ---------- | ------------------- | ------------ |
+| Read uncommitted | Possible   | Possible            | Possible     |
+| Read committed   | No         | Possible            | Possible     |
+| Repeatable read  | No         | No                  | Possible     |
+| Serializable     | No         | No                  | No           |
+
+**Serializable** is the only level that promises the result is the same as running the transactions one at a time, in some order. Lost updates and write skew were not in the original standard, so whether a level stops them depends on the engine.
+
+## What real databases give you
+
+The names are the same everywhere; what they mean is not.
+
+| Database       | Default level   | What its levels really do                                                                                                                                                                       |
+| -------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL     | Read committed  | Read uncommitted acts like read committed. Repeatable read is **snapshot isolation**: no phantoms, lost updates raise an error, but write skew gets through. Serializable stops write skew too. |
+| MySQL (InnoDB) | Repeatable read | Plain `SELECT`s read a snapshot. `UPDATE`s and locking reads see the latest committed rows and lock gaps to stop phantoms. Lost updates in read-then-write code are **not** detected.           |
+| SQLite         | Serializable    | Only one writer at a time, so transactions are serializable.                                                                                                                                    |
+| SQL Server     | Read committed  | Uses locks by default; snapshot isolation is an option you switch on.                                                                                                                           |
+| Oracle         | Read committed  | Its "serializable" is snapshot isolation, so write skew can happen.                                                                                                                             |
+
+Pick the level per transaction:
+
+```sql illustration
+-- PostgreSQL
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+SELECT count(*) FROM doctors WHERE on_call;
+UPDATE doctors SET on_call = false WHERE name = 'Asha';
+COMMIT;
+```
+
+<Callout type="warning">
+
+Don't trust the name of a level. Read your database's docs to learn which anomalies it really stops, especially lost updates and write skew.
+
+</Callout>
+
+## Fixing anomalies without serializable
+
+You don't always need the strictest level:
+
+- **Lost update:** do the change in one statement, so the database reads and writes under one lock: `UPDATE posts SET likes = likes + 1 WHERE id = 101;`.
+- **Lost update, when the app must decide:** lock the row while you read it with `SELECT ... FOR UPDATE` (see [Locking and deadlocks](/advanced/locking-and-deadlocks)).
+- **Write skew:** lock the rows the rule depends on with `FOR UPDATE`, or put the rule in a constraint the database checks.
+
+## Serialization failures and retrying
+
+At strict levels the database does not wait forever when two transactions clash. It lets one finish and aborts the other with a **serialization failure** (SQLSTATE `40001`):
+
+```text
+ERROR:  could not serialize access due to read/write dependencies among transactions
+```
+
+This is not a bug; it is the price of isolation. Your app must catch it and **run the whole transaction again** from `BEGIN`, re-reading the data, since the values it read before are now stale.
+
+<Callout type="info">
+
+Keep transactions short when you use a strict level. The longer a transaction runs, the more likely it clashes with another one and has to be retried.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Anomaly**
+  A result two concurrent transactions can produce that running them one after the other never could.
+- **Dirty read**
+  Reading a change another transaction has not committed yet.
+- **Isolation level**
+  How much concurrent transactions are allowed to see of and affect each other.
+- **Lost update**
+  Two read-then-write transactions where the second write overwrites the first.
+- **Non-repeatable read**
+  Reading the same row twice in one transaction and getting different values.
+- **Phantom read**
+  Running the same search twice in one transaction and getting new rows.
+- **Serializable**
+  The level whose result always matches running the transactions one at a time.
+- **Serialization failure**
+  An error that aborts a transaction to keep isolation; the app should retry it.
+- **Snapshot isolation**
+  Each transaction reads from a frozen picture of the database taken when it started.
+- **Write skew**
+  Two transactions read the same rows, change different ones, and together break a rule.
+
+</WordsToKnow>

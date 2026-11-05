@@ -1,0 +1,218 @@
+---
+title: Window functions
+description: A window function calculates across a group of related rows, such as a rank or a running total, without collapsing them into one row.
+level: advanced
+order: 6
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A **window function** looks at a group of rows related to the current row and returns one value for each row. Unlike [`GROUP BY`](/beginner/counting-and-grouping), it keeps every row.
+
+Here is a small sales table to work with:
+
+```sql
+CREATE TABLE sales (
+  id INTEGER PRIMARY KEY,
+  rep TEXT NOT NULL,
+  region TEXT NOT NULL,
+  month TEXT NOT NULL,
+  amount INTEGER NOT NULL
+);
+
+INSERT INTO sales (rep, region, month, amount) VALUES
+  ('Asha', 'North', '2026-01', 500),
+  ('Asha', 'North', '2026-02', 700),
+  ('Asha', 'North', '2026-03', 400),
+  ('Ravi', 'North', '2026-01', 700),
+  ('Ravi', 'North', '2026-02', 300),
+  ('Meera', 'South', '2026-01', 900),
+  ('Meera', 'South', '2026-02', 650),
+  ('Kabir', 'South', '2026-01', 650);
+```
+
+## Why GROUP BY is not enough
+
+`GROUP BY region` gives one row per region: you get the total, but lose each sale. To show each sale **next to** its region's total, you need a window:
+
+```sql
+SELECT region, rep, month, amount,
+       SUM(amount) OVER (PARTITION BY region) AS region_total,
+       ROUND(100.0 * amount / SUM(amount) OVER (PARTITION BY region), 1) AS pct
+FROM sales
+ORDER BY region, rep, month;
+```
+
+| region | rep   | month   | amount | region_total |  pct |
+| ------ | ----- | ------- | -----: | -----------: | ---: |
+| North  | Asha  | 2026-01 |    500 |         2600 | 19.2 |
+| North  | Asha  | 2026-02 |    700 |         2600 | 26.9 |
+| North  | Asha  | 2026-03 |    400 |         2600 | 15.4 |
+| North  | Ravi  | 2026-01 |    700 |         2600 | 26.9 |
+| North  | Ravi  | 2026-02 |    300 |         2600 | 11.5 |
+| South  | Kabir | 2026-01 |    650 |         2200 | 29.5 |
+| South  | Meera | 2026-01 |    900 |         2200 | 40.9 |
+| South  | Meera | 2026-02 |    650 |         2200 | 29.5 |
+
+## The parts of OVER
+
+```text
+SUM(amount) OVER (PARTITION BY rep  ORDER BY month  ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)
+                  └─ which rows ─┘  └─ in what ──┘  └──────── which slice of them ────────┘
+                     belong together    order            (the frame)
+```
+
+- **`PARTITION BY`** splits rows into groups. Leave it out and the whole result is one partition.
+- **`ORDER BY`** sorts rows inside each partition. Ranking and `LAG` need it.
+- The **frame** picks which rows around the current one the function sees.
+
+## Ranking: ROW_NUMBER, RANK, DENSE_RANK
+
+All three number rows in order. They differ only on ties:
+
+```sql
+SELECT rep, month, amount,
+       ROW_NUMBER() OVER (ORDER BY amount DESC) AS row_number,
+       RANK()       OVER (ORDER BY amount DESC) AS rank,
+       DENSE_RANK() OVER (ORDER BY amount DESC) AS dense_rank
+FROM sales
+WHERE region = 'North'
+ORDER BY amount DESC, rep;
+```
+
+| rep  | month   | amount | row_number | rank | dense_rank |
+| ---- | ------- | -----: | ---------: | ---: | ---------: |
+| Asha | 2026-02 |    700 |          1 |    1 |          1 |
+| Ravi | 2026-01 |    700 |          2 |    1 |          1 |
+| Asha | 2026-01 |    500 |          3 |    3 |          2 |
+| Asha | 2026-03 |    400 |          4 |    4 |          3 |
+| Ravi | 2026-02 |    300 |          5 |    5 |          4 |
+
+- `ROW_NUMBER` never repeats. Which of the two 700s gets 1 is up to the database, unless you add a tie-breaker to the window's `ORDER BY`.
+- `RANK` gives ties the same number, then skips: 1, 1, 3.
+- `DENSE_RANK` gives ties the same number without gaps: 1, 1, 2.
+
+## Running totals
+
+Add `ORDER BY` to a `SUM` window and it adds up the rows so far:
+
+```sql
+SELECT rep, month, amount,
+       SUM(amount) OVER (PARTITION BY rep ORDER BY month) AS running_total
+FROM sales
+ORDER BY rep, month;
+```
+
+| rep   | month   | amount | running_total |
+| ----- | ------- | -----: | ------------: |
+| Asha  | 2026-01 |    500 |           500 |
+| Asha  | 2026-02 |    700 |          1200 |
+| Asha  | 2026-03 |    400 |          1600 |
+| Kabir | 2026-01 |    650 |           650 |
+| Meera | 2026-01 |    900 |           900 |
+| Meera | 2026-02 |    650 |          1550 |
+| Ravi  | 2026-01 |    700 |           700 |
+| Ravi  | 2026-02 |    300 |          1000 |
+
+<Callout type="warning">
+
+With `ORDER BY` and no frame, the default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. `RANGE` includes every row that **ties** with the current one, so two rows in the same month would both show the total of both. Write `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` when you want strictly one row at a time.
+
+</Callout>
+
+## Frames: moving averages
+
+A frame counts rows around the current one. Here, each month is averaged with the month before:
+
+```sql
+SELECT month, amount,
+       AVG(amount) OVER (ORDER BY month ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS avg_2_months
+FROM sales
+WHERE rep = 'Asha'
+ORDER BY month;
+```
+
+| month   | amount | avg_2_months |
+| ------- | -----: | -----------: |
+| 2026-01 |    500 |        500.0 |
+| 2026-02 |    700 |        600.0 |
+| 2026-03 |    400 |        550.0 |
+
+The first row has no row before it, so its average uses only itself.
+
+## LAG and LEAD: the row before and after
+
+`LAG` reads a value from an earlier row, `LEAD` from a later one. Month-on-month change becomes one line:
+
+```sql
+SELECT rep, month, amount,
+       amount - LAG(amount) OVER (PARTITION BY rep ORDER BY month) AS change
+FROM sales
+WHERE rep IN ('Asha', 'Meera')
+ORDER BY rep, month;
+```
+
+| rep   | month   | amount | change |
+| ----- | ------- | -----: | -----: |
+| Asha  | 2026-01 |    500 |   NULL |
+| Asha  | 2026-02 |    700 |    200 |
+| Asha  | 2026-03 |    400 |   -300 |
+| Meera | 2026-01 |    900 |   NULL |
+| Meera | 2026-02 |    650 |   -250 |
+
+The first month has nothing before it, so `LAG` returns `NULL`. `LAG(amount, 1, 0)` would return `0` instead.
+
+## Top N per group
+
+"The best sale in each region" is a classic window job. Number the rows inside each region, then keep number 1:
+
+```sql
+SELECT region, rep, month, amount
+FROM (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY region ORDER BY amount DESC, id) AS rn
+  FROM sales
+)
+WHERE rn = 1
+ORDER BY region;
+```
+
+| region | rep   | month   | amount |
+| ------ | ----- | ------- | -----: |
+| North  | Asha  | 2026-02 |    700 |
+| South  | Meera | 2026-01 |    900 |
+
+Change `rn = 1` to `rn <= 3` for the top 3. Use `RANK` instead of `ROW_NUMBER` if ties should all be kept.
+
+## When window functions run
+
+Window functions run late, after the rows are filtered and grouped:
+
+```text
+FROM → WHERE → GROUP BY → HAVING → window functions → SELECT → ORDER BY → LIMIT
+```
+
+That is why you cannot write `WHERE rn = 1` in the same query: `WHERE` runs before `rn` exists. Wrap the query in a [subquery](/beginner/subqueries) or a [CTE](/advanced/ctes-and-recursive-queries), as above.
+
+<Callout type="info">
+
+Repeating the same `OVER (...)` gets long. Name it once with `WINDOW w AS (PARTITION BY rep ORDER BY month)` after `WHERE`/`GROUP BY`, then write `SUM(amount) OVER w`. SQLite, PostgreSQL and MySQL 8 all support it.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Frame**
+  The slice of a partition a window function sees, such as the current row and the one before.
+- **LAG / LEAD**
+  Window functions that read a value from an earlier or later row.
+- **Partition**
+  A group of rows that a window function works on together, set by PARTITION BY.
+- **Running total**
+  A sum of the current row and every row before it.
+- **Window function**
+  A function that calculates over related rows and returns a value for every row, without grouping them.
+
+</WordsToKnow>

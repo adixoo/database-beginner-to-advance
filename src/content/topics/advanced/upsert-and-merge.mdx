@@ -1,0 +1,165 @@
+---
+title: Upsert and MERGE
+description: An upsert inserts a row or updates it if it already exists, in one safe statement instead of a check followed by a write.
+level: advanced
+order: 9
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+An **upsert** means "insert this row, or update it if it's already there". It sounds like two steps, and that is exactly the problem it solves.
+
+```sql
+CREATE TABLE inventory (
+  sku TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT
+);
+
+INSERT INTO inventory (sku, name, qty, updated_at) VALUES
+  ('MUG-01', 'Mug', 10, '2026-11-01'),
+  ('TEE-01', 'T-shirt', 5, '2026-11-01');
+```
+
+## The race in "check, then insert"
+
+The obvious app code reads first, then decides:
+
+```text
+if (SELECT … WHERE sku = 'CAP-01') finds nothing:
+    INSERT …
+else:
+    UPDATE …
+```
+
+With two requests at the same moment, both can read "nothing" before either inserts:
+
+```text
+request A                         request B
+SELECT … CAP-01  → not found
+                                  SELECT … CAP-01  → not found
+INSERT CAP-01    → ok
+                                  INSERT CAP-01    → UNIQUE constraint failed
+```
+
+Without a unique constraint it's worse: you get two `CAP-01` rows. An upsert does the check and the write as one step inside the database, so there is no gap between them.
+
+## INSERT … ON CONFLICT DO UPDATE
+
+SQLite and PostgreSQL share the same syntax. Name the unique column to watch, then say what to do when a row with that value already exists:
+
+```sql
+INSERT INTO inventory (sku, name, qty, updated_at) VALUES
+  ('MUG-01', 'Mug', 3, '2026-11-05'),
+  ('CAP-01', 'Cap', 7, '2026-11-05')
+ON CONFLICT (sku) DO UPDATE SET
+  qty = inventory.qty + excluded.qty,
+  updated_at = excluded.updated_at
+RETURNING sku, qty, updated_at;
+```
+
+| sku    | qty | updated_at |
+| ------ | --: | ---------- |
+| MUG-01 |  13 | 2026-11-05 |
+| CAP-01 |   7 | 2026-11-05 |
+
+- `MUG-01` existed, so its row was updated: 10 + 3 = 13.
+- `CAP-01` was new, so it was inserted.
+- `inventory.qty` is the row already in the table. **`excluded.qty`** is the value you tried to insert.
+- `RETURNING` hands back the final rows, so the app doesn't need a second `SELECT`. SQLite 3.35+ and PostgreSQL support it; MySQL does not.
+
+You can add a `WHERE` to the update, for example to keep only newer data: `DO UPDATE SET … WHERE excluded.updated_at > inventory.updated_at`.
+
+## DO NOTHING
+
+To keep the existing row and skip the new one:
+
+```sql
+INSERT INTO inventory (sku, name, qty) VALUES ('TEE-01', 'T-shirt', 99)
+ON CONFLICT (sku) DO NOTHING;
+```
+
+`TEE-01` still has 5. This is how you make "create if missing" safe to retry. With `RETURNING`, a skipped row returns nothing, so the app can tell inserted from skipped.
+
+## Which conflict counts
+
+The conflict target, `(sku)` here, must match a `PRIMARY KEY` or `UNIQUE` constraint. The upsert only handles clashes on that one. If the table also had `UNIQUE (name)` and your row clashed on `name`, you'd still get an error.
+
+In MySQL there is no target: `ON DUPLICATE KEY UPDATE` fires on **any** unique key, which can update a row you didn't expect.
+
+```sql illustration
+-- MySQL 8.0.19+
+INSERT INTO inventory (sku, name, qty) VALUES ('MUG-01', 'Mug', 3) AS new
+ON DUPLICATE KEY UPDATE qty = qty + new.qty;
+```
+
+<Callout type="warning">
+
+MySQL's `INSERT IGNORE` looks like `DO NOTHING`, but it also turns other errors, such as a value too long for its column, into warnings. Your data gets quietly changed instead of rejected.
+
+</Callout>
+
+## The INSERT OR REPLACE trap
+
+SQLite's `INSERT OR REPLACE` (and MySQL's `REPLACE`) look like upserts, but they **delete** the old row and insert a new one:
+
+```sql
+INSERT OR REPLACE INTO inventory (sku, name, qty) VALUES ('TEE-01', 'T-shirt', 8);
+
+SELECT * FROM inventory WHERE sku = 'TEE-01';
+```
+
+| sku    | name    | qty | updated_at |
+| ------ | ------- | --: | ---------- |
+| TEE-01 | T-shirt |   8 | NULL       |
+
+`updated_at` was `'2026-11-01'` and is now `NULL`: any column you didn't list falls back to its default. The delete can also fire `ON DELETE CASCADE` on child rows and give the row a new `rowid`. Prefer `ON CONFLICT DO UPDATE`.
+
+## MERGE
+
+**`MERGE`** is the SQL standard's bigger tool. It compares a whole source of rows with a target table and says what to do for matches and non-matches, including deletes. PostgreSQL 15+, SQL Server and Oracle support it; SQLite and MySQL do not.
+
+```sql illustration
+-- PostgreSQL 15+: apply a stock count from the warehouse
+MERGE INTO inventory AS t
+USING (VALUES ('MUG-01', 'Mug', 0), ('HAT-01', 'Hat', 4)) AS s (sku, name, qty)
+ON t.sku = s.sku
+WHEN MATCHED AND s.qty = 0 THEN
+  DELETE
+WHEN MATCHED THEN
+  UPDATE SET qty = s.qty
+WHEN NOT MATCHED THEN
+  INSERT (sku, name, qty) VALUES (s.sku, s.name, s.qty);
+```
+
+| Tool          | Best for                                    | Race-safe on its own                                                 |
+| ------------- | ------------------------------------------- | -------------------------------------------------------------------- |
+| `ON CONFLICT` | One row or a batch, insert-or-update        | Yes                                                                  |
+| `MERGE`       | Syncing a table with a source, with deletes | No: two sessions inserting the same key can still hit a unique error |
+
+<Callout type="info">
+
+PostgreSQL's docs say it plainly: for "insert, or update if it exists" under concurrency, use `ON CONFLICT`. In SQL Server, add `WITH (HOLDLOCK)` to the `MERGE` target to make it safe.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **Conflict target**
+  The unique column or columns an upsert watches for clashes.
+- **excluded**
+  In an upsert, the row you tried to insert, as opposed to the row already in the table.
+- **MERGE**
+  A standard SQL statement that inserts, updates or deletes target rows by comparing them with a source.
+- **Race condition**
+  A bug where the result depends on which of two simultaneous requests runs first.
+- **RETURNING**
+  A clause that returns the rows a write changed, without a separate SELECT.
+- **Upsert**
+  Insert a row, or update it if a row with the same key already exists.
+
+</WordsToKnow>

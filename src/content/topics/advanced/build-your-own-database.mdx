@@ -1,0 +1,248 @@
+---
+title: Build your own database
+description: Put every advanced topic together by building a small database engine from scratch, one working version at a time.
+level: advanced
+order: 29
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+The best way to understand a database is to build one. Not PostgreSQL in a weekend: a series of small versions, each one working, tested and a little more capable than the last. By the end you will have a tiny engine with a SQL parser, a B+ tree, transactions and crash recovery, and you will know why each piece exists.
+
+## The plan
+
+| Version | You add                  | Topics it uses                                                                                                    |
+| ------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| v0      | Key-value store on a log | [Disk I/O and fsync](/advanced/disk-io-and-fsync), [Hash indexes](/advanced/hash-indexes)                         |
+| v1      | Pages and records        | [How rows are stored](/advanced/how-rows-are-stored), [How values are encoded](/advanced/how-values-are-encoded)  |
+| v2      | Buffer pool              | [The buffer pool](/advanced/buffer-pool)                                                                          |
+| v3      | B+ tree index            | [B+ tree internals](/advanced/b-tree-internals)                                                                   |
+| v4      | Tables and a catalog     | [Tricky data types](/advanced/tricky-data-types)                                                                  |
+| v5      | SQL parser               | [How a query runs](/advanced/how-a-query-runs)                                                                    |
+| v6      | Executor                 | [How a query runs](/advanced/how-a-query-runs), [Join algorithms](/advanced/join-algorithms)                      |
+| v7      | Planner                  | [The query optimizer](/advanced/query-optimizer), [Reading EXPLAIN plans](/advanced/reading-explain-plans)        |
+| v8      | Transactions and locks   | [Isolation levels](/advanced/isolation-levels), [Locking and deadlocks](/advanced/locking-and-deadlocks)          |
+| v9      | WAL and recovery         | [WAL and crash recovery](/advanced/wal-and-crash-recovery)                                                        |
+| v10     | MVCC                     | [MVCC](/advanced/mvcc)                                                                                            |
+| v11     | Network server           | [Consensus and distributed transactions](/advanced/consensus-and-distributed-transactions) for idempotent retries |
+
+## Pick a language
+
+| Language | Why pick it                                                          | Watch out for                                               |
+| -------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Rust     | Control over bytes and memory, with the compiler catching data races | Slower start; the borrow checker fights pointer-heavy trees |
+| Go       | Quick to write, great networking and concurrency for v8 and v11      | The garbage collector hides memory layout                   |
+| C++      | What most real engines are written in; nothing is hidden             | Memory bugs are yours to find                               |
+
+Python or TypeScript work for v0 to v5 if you mainly want the ideas, but you will not feel the cost of copying bytes or allocating memory.
+
+<Callout type="info">
+
+Keep every version. Tag it in git (`v0`, `v1` …), keep its tests passing, and write a short note on what surprised you. The notes are half the value.
+
+</Callout>
+
+## v0: a key-value store
+
+**Goal:** `SET`, `GET` and `DELETE` that survive a restart.
+
+```text
+SET name aditya
+GET name        → aditya
+DELETE name
+GET name        → (nil)
+```
+
+**Build:** a **Bitcask**-style store. Every write is appended to the end of one file; nothing is ever overwritten. An in-memory hash map points each key at the position of its latest value. A delete appends a **tombstone**. On start-up, read the file from the top and rebuild the map.
+
+```python illustration
+import os, struct
+
+HEADER = struct.Struct('<II')   # key length, value length, little-endian
+TOMBSTONE = 0xFFFFFFFF          # a value length that means "deleted"
+
+class KV:
+    def __init__(self, path):
+        self.f = open(path, 'a+b')
+        self.index = {}         # key -> (offset, length) of its latest value
+        self.f.seek(0)
+        while len(header := self.f.read(HEADER.size)) == HEADER.size:
+            klen, vlen = HEADER.unpack(header)
+            key = self.f.read(klen)
+            if vlen == TOMBSTONE:
+                self.index.pop(key, None)
+            else:
+                self.index[key] = (self.f.tell(), vlen)
+                self.f.seek(vlen, os.SEEK_CUR)
+
+    def _append(self, key, value, vlen):
+        self.f.seek(0, os.SEEK_END)
+        self.f.write(HEADER.pack(len(key), vlen) + key)
+        offset = self.f.tell()
+        self.f.write(value)
+        self.f.flush()
+        os.fsync(self.f.fileno())   # on disk before we answer "OK"
+        return offset
+
+    def set(self, key: bytes, value: bytes):
+        self.index[key] = (self._append(key, value, len(value)), len(value))
+
+    def get(self, key: bytes):
+        if key not in self.index:
+            return None
+        offset, length = self.index[key]
+        self.f.seek(offset)
+        return self.f.read(length)
+
+    def delete(self, key: bytes):
+        self._append(key, b'', TOMBSTONE)
+        self.index.pop(key, None)
+```
+
+**Test it:**
+
+- Kill the process with `kill -9` in the middle of a long run of writes, restart, and check every acknowledged write is there. You will find the last record can be half-written: add a length check and a CRC32 checksum per record, and ignore a torn tail.
+- Benchmark 100,000 `SET`s with and without `fsync`. Expect a difference of 100× or more.
+- The file only grows. Add **compaction**: write the live keys to a new file, then swap it in.
+
+## v1: pages and records
+
+**Goal:** store rows in fixed-size pages instead of one endless log.
+
+**Build:** a **disk manager** that reads and writes 4 KB pages by page number, and a **slotted page**: a header, a slot array growing from the front, and records growing from the back. Support insert, read, update and delete by record id `(page, slot)`, and reuse the space freed by deletes.
+
+**Test it:** fill a page until it refuses, delete every other record, and check new inserts reuse the gaps. Write and read back records of every size from 1 byte to just under a page.
+
+## v2: buffer pool
+
+**Goal:** stop reading the same page from disk again and again.
+
+**Build:** a fixed number of in-memory frames, a page table from page number to frame, pin and unpin counts, a dirty flag, and an eviction policy: start with LRU, then try clock. Never evict a pinned page; write a dirty page back before reusing its frame.
+
+**Test it:** count hits and misses. Run a workload that touches 10% of pages 90% of the time with a pool of 1%, 10% and 50% of the file, and graph the hit rate. Then run a full scan and watch it push the hot pages out: that is why real engines protect against scans.
+
+## v3: B+ tree
+
+**Goal:** find a key in a few page reads instead of scanning.
+
+**Build:** a B+ tree whose nodes are pages from the buffer pool. Leaves hold keys and record ids and link to their right neighbour; internal nodes hold keys and child page numbers. Implement search, insert with splits, range scans along the leaf chain, then delete with merges (the hardest part, so do it last).
+
+**Test it:** insert a million random keys and check the tree after each split: keys sorted in every node, every leaf at the same depth, every node at least half full. Compare against a sorted list in memory. Benchmark point lookups against a full scan at 1K, 100K and 1M rows.
+
+## v4: tables and a catalog
+
+**Goal:** typed tables with columns, not raw bytes.
+
+**Build:** encode rows from a schema (integers, text, booleans, NULL bitmap), and a **catalog**: system tables such as `system_tables` and `system_columns` stored in your own pages, describing every table and index. Your database should describe itself with its own data.
+
+**Test it:** create a table, restart, and check the schema comes back from disk. Round-trip every type, including NULL, empty text and the largest and smallest integers.
+
+## v5: SQL parser
+
+**Goal:** turn text into a tree.
+
+```sql illustration
+SELECT name FROM users WHERE age > 18;
+```
+
+```text
+Select
+├── columns: [name]
+├── from: users
+└── where: BinaryOp(>)
+           ├── Column(age)
+           └── Literal(18)
+```
+
+**Build:** a **lexer** that turns characters into tokens (`SELECT`, identifier `name`, `>`, number `18`), and a recursive-descent **parser** that turns tokens into an AST. Support `CREATE TABLE`, `INSERT`, `SELECT ... WHERE ... ORDER BY`, `UPDATE` and `DELETE`. Get operator precedence right: `a OR b AND c` means `a OR (b AND c)`.
+
+**Test it:** a table of SQL strings and expected trees. Also test bad SQL: every error should say where it went wrong, not crash.
+
+## v6: executor
+
+**Goal:** run the tree and get rows back.
+
+**Build:** operators in the **iterator** (Volcano) model, each with `open()`, `next()` and `close()`: sequential scan, index scan, filter, projection, sort, limit, aggregate, nested-loop join, then hash join. Plug them together into a tree and pull rows from the top.
+
+**Test it:** run the same queries against your engine and SQLite on the same data and compare results. This differential testing finds more bugs than anything else you will write.
+
+## v7: planner
+
+**Goal:** choose a good plan, not just a correct one.
+
+**Build:** turn the AST into a **logical plan**, apply rules (push filters down, drop unused columns, fold constants such as `1 + 1`), then pick a **physical plan**: index scan or full scan, hash join or nested loop. Keep simple statistics (row counts, distinct values) and estimate costs from them. Add an `EXPLAIN` command that prints the chosen plan.
+
+**Test it:** check `EXPLAIN` picks the index for `WHERE id = 10` and a full scan for `WHERE id > 0`. Time both choices to see if the estimate was right.
+
+## v8: transactions and locks
+
+**Goal:** several clients at once, without corrupting each other.
+
+**Build:** `BEGIN`, `COMMIT` and `ROLLBACK`; a lock manager with shared and exclusive locks; strict two-phase locking; and deadlock detection with a waits-for graph, aborting one victim.
+
+**Test it:** run two threads that transfer money between 100 accounts thousands of times. The total must never change. Then write one test per anomaly from [Isolation levels](/advanced/isolation-levels) and show your engine prevents it.
+
+## v9: WAL and recovery
+
+**Goal:** a committed transaction survives any crash.
+
+**Build:** a write-ahead log with an LSN per record; the rule that a page may only be written after its log records are on disk; `COMMIT` returns only after an `fsync` of the log; redo on start-up; then undo of transactions that never committed; then checkpoints so recovery does not replay the whole history.
+
+**Test it:** this is where crash testing pays off. Add a crash point that kills the process at a random moment (during insert, during commit, half-way through flushing a page, during a checkpoint), restart, and check two rules thousands of times: every acknowledged commit is present, and nothing from an uncommitted transaction is.
+
+## v10: MVCC
+
+**Goal:** readers never wait for writers.
+
+**Build:** transaction ids; `UPDATE` writes a new row version instead of overwriting; each version records which transaction created and deleted it; each transaction takes a snapshot and sees only versions visible to it. Then add **vacuum** to remove versions nobody can see any more.
+
+**Test it:** start a long read, run many updates alongside it, and check the read sees one consistent picture throughout. Watch the table grow without vacuum, then shrink back with it.
+
+## v11: a server
+
+**Goal:** other programs can connect.
+
+**Build:** a TCP server with a small protocol: a length-prefixed message carrying SQL, and a reply of rows or an error. Add a connection per client, a command-line client, a password check (hash it with argon2 or bcrypt), and prepared statements with parameters, which also prevent SQL injection.
+
+**Test it:** connect 100 clients running the v8 money test at once. Benchmark queries per second and p50, p95 and p99 latency.
+
+<Callout type="warning">
+
+Your engine is for learning. Do not store anything you care about in it. Real engines have decades of fixes for failures you have not hit yet.
+
+</Callout>
+
+## What to read next
+
+- **SQLite**: start with its [architecture overview](https://www.sqlite.org/arch.html), then the [source](https://github.com/sqlite/sqlite) for the pager, B-tree and virtual machine. It is small enough to read and very well commented.
+- **PostgreSQL**: the [source](https://github.com/postgres/postgres), and the README files inside `src/backend`, such as the ones for the buffer manager, access methods and the optimizer.
+- **CMU 15-445/645 Database Systems**: the free [course](https://15445.courses.cs.cmu.edu/) with lectures and BusTub, a teaching engine whose projects match v2 to v8 here.
+- **Let's Build a Simple Database**: a [tutorial](https://cstack.github.io/db_tutorial/) that builds a SQLite clone in C.
+- **Books**: _Database Internals_ by Alex Petrov for storage and distribution; _Designing Data-Intensive Applications_ by Martin Kleppmann for the big picture.
+- **Papers**: Bitcask (2010) for v0, Volcano by Goetz Graefe (1994) for v6, System R's optimizer by Selinger et al. (1979) for v7, ARIES by Mohan et al. (1992) for v9, and [Raft](https://raft.github.io/raft.pdf) by Ongaro and Ousterhout (2014) when you go distributed.
+
+## Words to know
+
+<WordsToKnow>
+
+- **AST**
+  Abstract syntax tree: the parsed shape of a SQL statement.
+- **Bitcask**
+  A key-value store design: an append-only log plus an in-memory hash index.
+- **Catalog**
+  The database's own tables that describe its tables, columns and indexes.
+- **Compaction**
+  Rewriting a log or file to keep only live data.
+- **Crash testing**
+  Killing a program at random moments to check it recovers correctly.
+- **Differential testing**
+  Running the same input through two systems and comparing the results.
+- **Disk manager**
+  The part of an engine that reads and writes pages to files.
+- **Lexer**
+  The step that splits text into tokens before parsing.
+- **Tombstone**
+  A record that marks a key as deleted.
+
+</WordsToKnow>

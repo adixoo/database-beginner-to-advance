@@ -1,0 +1,234 @@
+---
+title: Specialised indexes
+description: Full-text, GIN, GiST, R-tree, BRIN, bitmap and trigram indexes, and the queries each one answers that a B+ tree cannot.
+level: advanced
+order: 15
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A [B+ tree](/advanced/b-tree-internals) is built for one-dimensional, sortable values and questions like "equal to", "between" and "starts with". Plenty of real questions do not fit that shape:
+
+- Which articles mention "index" and "fast"?
+- Which products have the tag `sale`?
+- Which cafés are within 1 km of me?
+- Which bookings overlap 3 pm to 5 pm?
+- Which names contain "son" anywhere?
+
+Each needs a different structure. Most examples below are PostgreSQL, which has the widest choice; the ideas are the same everywhere.
+
+## Inverted indexes for full-text search
+
+`WHERE body LIKE '%index%'` has to read every row, and it matches "reindexing" but not "Indexes". Full-text search instead builds an **inverted index**: for every word, the list of documents that contain it, like the index at the back of a textbook.
+
+Before words go in, the text is **tokenised** and normalised:
+
+```text
+"Indexes make the queries faster"
+
+tokenise   ->  Indexes | make | the | queries | faster
+lowercase  ->  indexes | make | the | queries | faster
+stop words ->  indexes | make | queries | faster         ("the" dropped)
+stem       ->  index   | make | queri   | fast           (word roots)
+```
+
+**Stemming** cuts words to a root so "index", "indexes" and "indexing" all match each other. Then the index maps each term to a **posting list** of document ids:
+
+```text
+fast   ->  [2, 7, 19]
+index  ->  [2, 3, 7, 41]
+queri  ->  [3, 7, 19]
+
+"index AND fast"  ->  intersect [2, 3, 7, 41] and [2, 7, 19]  ->  [2, 7]
+```
+
+Posting lists are kept sorted, so intersecting them is a quick merge. Engines also store word positions (for phrase search) and counts (for ranking results by relevance).
+
+**SQLite** does this with the FTS5 extension, a virtual table with its own inverted index:
+
+```sql illustration
+CREATE VIRTUAL TABLE articles_fts USING fts5(title, body, tokenize = 'porter unicode61');
+
+INSERT INTO articles_fts (title, body) VALUES
+  ('Indexing basics', 'Indexes make the queries faster.'),
+  ('Slow reports', 'Without an index, the query scans every row.');
+
+SELECT title FROM articles_fts
+WHERE articles_fts MATCH 'index AND fast'
+ORDER BY rank;
+```
+
+**PostgreSQL** stores the processed text as a `tsvector` and indexes it with GIN:
+
+```sql illustration
+ALTER TABLE articles ADD COLUMN search tsvector
+  GENERATED ALWAYS AS (to_tsvector('english', title || ' ' || body)) STORED;
+
+CREATE INDEX idx_articles_search ON articles USING GIN (search);
+
+SELECT title FROM articles
+WHERE search @@ to_tsquery('english', 'index & fast');
+```
+
+For large-scale search with typo tolerance and complex ranking, teams often move to a dedicated engine such as Elasticsearch, OpenSearch or Meilisearch. They are built on the same inverted index.
+
+## GIN: many keys per row
+
+An inverted index is one case of a more general idea: a row that contains _many_ values, each of which should find it. PostgreSQL's **GIN** (generalised inverted index) applies it to arrays and JSONB too:
+
+```sql illustration
+-- Arrays: products tagged 'sale'
+CREATE INDEX idx_products_tags ON products USING GIN (tags);
+SELECT * FROM products WHERE tags @> ARRAY['sale'];
+
+-- JSONB: users whose settings contain this key and value
+CREATE INDEX idx_users_settings ON users USING GIN (settings jsonb_path_ops);
+SELECT * FROM users WHERE settings @> '{"plan": "pro"}';
+```
+
+GIN is fast to read but slow to update, since one row can add dozens of entries. PostgreSQL buffers new entries in a "pending list" and merges them in batches to soften that.
+
+## GiST and R-trees: shapes and ranges
+
+Some values are not points on a line but areas: a map location's bounding box, a time range, an IP range. Two areas can overlap, contain each other or sit near each other, and none of that fits a single sorted order.
+
+An **R-tree** groups nearby shapes into bounding rectangles, then groups those rectangles into bigger ones, like a B+ tree of boxes:
+
+```text
+Root:   [ A: whole north half ]          [ B: whole south half ]
+           /            \                   /           \
+   [ A1: cafés NW ]  [ A2: cafés NE ]   [ B1 ... ]    [ B2 ... ]
+     . . .             . . .
+
+"cafés near point P": only descend into boxes that P's search circle touches
+```
+
+A search descends only into boxes that intersect the area of interest, and skips the rest of the map. Unlike a B+ tree, boxes can overlap, so a search may follow more than one branch.
+
+PostgreSQL's **GiST** (generalised search tree) is a framework for trees like this. It powers R-tree-style indexes for geometry, range types, and nearest-neighbour searches:
+
+```sql illustration
+-- PostGIS: cafés within 1 km, nearest first
+CREATE INDEX idx_cafes_location ON cafes USING GIST (location);
+
+SELECT name FROM cafes
+WHERE ST_DWithin(location, ST_MakePoint(77.209, 28.614)::geography, 1000)
+ORDER BY location <-> ST_MakePoint(77.209, 28.614)::geography
+LIMIT 5;
+
+-- No two bookings of the same room may overlap
+CREATE EXTENSION btree_gist;
+
+CREATE TABLE bookings (
+  room_id INTEGER,
+  during TSTZRANGE,
+  EXCLUDE USING GIST (room_id WITH =, during WITH &&)
+);
+```
+
+The `EXCLUDE` constraint is a rule a B-tree cannot enforce: "no two rows where the rooms are equal _and_ the time ranges overlap". SQLite has an R-tree too, as its R\*Tree module; MySQL has `SPATIAL` indexes for geometry columns.
+
+## BRIN: tiny indexes for huge, ordered tables
+
+An events table that only ever appends rows with the current time has a useful property: rows written in the same hour sit physically next to each other. **BRIN** (block range index) takes advantage of that. Instead of one entry per row, it stores the minimum and maximum value for each range of pages, 128 pages by default:
+
+```text
+pages 0-127      created_at  2026-01-01 00:00 .. 2026-01-01 06:10
+pages 128-255    created_at  2026-01-01 06:10 .. 2026-01-01 12:25
+pages 256-383    created_at  2026-01-01 12:25 .. 2026-01-01 18:40
+...
+
+WHERE created_at BETWEEN '2026-01-01 13:00' AND '2026-01-01 14:00'
+  -> read only pages 256-383
+```
+
+```sql illustration
+CREATE INDEX idx_events_created_at ON events USING BRIN (created_at);
+```
+
+A BRIN index on a billion-row table can be a few megabytes, where a B-tree would be tens of gigabytes. The catch: it only works when the column's values follow the physical order of the rows. On a randomly ordered column, every range spans everything, and the index skips nothing.
+
+## Bitmap indexes: analytics on few distinct values
+
+A **bitmap index** keeps one bit array per distinct value, with one bit per row:
+
+```text
+row:            1 2 3 4 5 6 7 8
+country = IN    1 0 0 1 1 0 0 1
+country = US    0 1 0 0 0 1 0 0
+plan = pro      1 1 0 0 1 0 0 1
+
+country = IN AND plan = pro  ->  1 0 0 0 1 0 0 1   (bitwise AND)  ->  rows 1, 5, 8
+```
+
+Combining conditions is a bitwise AND or OR over long arrays, which CPUs do extremely fast, and arrays of mostly zeros compress very well (for example with Roaring bitmaps). They suit columns with few distinct values in read-heavy analytics: Oracle offers them, and engines like Apache Druid and Pinot are built on them. They suit busy OLTP tables badly, because updating one row can lock a whole bitmap.
+
+<Callout type="info">
+
+PostgreSQL has no bitmap index you can create, but it builds bitmaps at query time. A "Bitmap Heap Scan" in a plan combines several ordinary indexes this way. See [Reading EXPLAIN plans](/advanced/reading-explain-plans).
+
+</Callout>
+
+## Trigram indexes: LIKE with a leading wildcard
+
+[Choosing indexes well](/advanced/choosing-indexes) showed that a B+ tree cannot help `LIKE '%son%'`. A **trigram** index can. It splits each value into every run of three characters:
+
+```text
+'jason'  ->  "  j", " ja", "jas", "aso", "son", "on "
+```
+
+The pattern `'%son%'` contains the trigram `son`, so the index returns only rows that have it, and those few rows are checked properly. PostgreSQL provides this with the `pg_trgm` extension:
+
+```sql illustration
+CREATE EXTENSION pg_trgm;
+CREATE INDEX idx_users_name_trgm ON users USING GIN (name gin_trgm_ops);
+
+SELECT * FROM users WHERE name ILIKE '%son%';
+SELECT * FROM users WHERE name % 'jasn';   -- similar to: catches typos
+```
+
+Patterns need at least three characters to help, and very common trigrams match too many rows to save much.
+
+## Which index for which question
+
+| Question                            | Index                | Where                                       |
+| ----------------------------------- | -------------------- | ------------------------------------------- |
+| Words in text, ranked               | Inverted (full-text) | SQLite FTS5, PostgreSQL GIN, MySQL FULLTEXT |
+| Arrays or JSON contain a value      | GIN                  | PostgreSQL                                  |
+| Near, inside or overlapping shapes  | R-tree / GiST        | PostGIS, SQLite R\*Tree, MySQL SPATIAL      |
+| Overlapping time or number ranges   | GiST                 | PostgreSQL range types                      |
+| Ranges over huge append-only tables | BRIN                 | PostgreSQL                                  |
+| AND/OR of low-cardinality columns   | Bitmap               | Oracle, Druid, Pinot                        |
+| Substring search, typo tolerance    | Trigram              | PostgreSQL `pg_trgm`                        |
+
+<Callout type="warning">
+
+Each of these is slower to write and larger than you might expect. Add one when a real query needs it and `EXPLAIN` shows it being used, not in case it helps someday.
+
+</Callout>
+
+## Words to know
+
+<WordsToKnow>
+
+- **BRIN**
+  A block range index that stores only the minimum and maximum value per range of pages.
+- **Bitmap index**
+  One bit array per distinct value, combined with fast bitwise AND and OR.
+- **GIN**
+  PostgreSQL's generalised inverted index, for values that contain many keys, such as text, arrays and JSONB.
+- **GiST**
+  PostgreSQL's generalised search tree, a framework for indexes on shapes, ranges and nearness.
+- **Inverted index**
+  A map from each word or key to the list of rows that contain it.
+- **Posting list**
+  The sorted list of row ids stored for one term in an inverted index.
+- **R-tree**
+  A tree of nested bounding rectangles for finding shapes by location.
+- **Stemming**
+  Cutting words down to a common root so different forms match.
+- **Trigram**
+  A run of three characters; trigram indexes use them to speed up substring search.
+
+</WordsToKnow>

@@ -1,0 +1,220 @@
+---
+title: Triggers, functions and materialized views
+description: Triggers run SQL automatically when rows change, stored functions keep logic inside the database, and materialized views save a query's result for fast reads.
+level: advanced
+order: 10
+---
+
+import Callout from '@/components/Callout.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Three ways to put logic inside the database instead of your app: **triggers** react to changes, **stored functions** are code you call, and **materialized views** remember a query's answer.
+
+```sql
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  customer TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new',
+  placed_on TEXT NOT NULL
+);
+
+CREATE TABLE order_log (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL,
+  old_status TEXT,
+  new_status TEXT,
+  changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE daily_totals (
+  day TEXT PRIMARY KEY,
+  orders INTEGER NOT NULL,
+  revenue INTEGER NOT NULL
+);
+```
+
+## Triggers
+
+A **trigger** is SQL the database runs by itself when a row is inserted, updated or deleted. It fires `BEFORE` or `AFTER` the change, and can read the row through two names:
+
+| Event    | `OLD`           | `NEW`         |
+| -------- | --------------- | ------------- |
+| `INSERT` | —               | The new row   |
+| `UPDATE` | The row before  | The row after |
+| `DELETE` | The deleted row | —             |
+
+### An audit log
+
+Record every status change, whoever makes it and from whichever app:
+
+```sql
+CREATE TRIGGER orders_log_status
+AFTER UPDATE OF status ON orders
+WHEN OLD.status <> NEW.status
+BEGIN
+  INSERT INTO order_log (order_id, old_status, new_status)
+  VALUES (NEW.id, OLD.status, NEW.status);
+END;
+```
+
+`UPDATE OF status` fires only when that column is in the `UPDATE`, and `WHEN` skips updates that don't really change it.
+
+### Refuse a change
+
+A `BEFORE` trigger can stop a change that a [constraint](/beginner/constraints) can't express, because it needs the old value:
+
+```sql
+CREATE TRIGGER orders_no_unship
+BEFORE UPDATE OF status ON orders
+WHEN OLD.status = 'shipped' AND NEW.status = 'new'
+BEGIN
+  SELECT RAISE(ABORT, 'a shipped order cannot go back to new');
+END;
+```
+
+### Keep a summary in sync
+
+This trigger keeps one row per day in `daily_totals` up to date on every insert, using an [upsert](/advanced/upsert-and-merge). A second one handles deletes:
+
+```sql
+CREATE TRIGGER orders_add_total
+AFTER INSERT ON orders
+BEGIN
+  INSERT INTO daily_totals (day, orders, revenue)
+  VALUES (NEW.placed_on, 1, NEW.amount)
+  ON CONFLICT (day) DO UPDATE SET
+    orders = daily_totals.orders + 1,
+    revenue = daily_totals.revenue + excluded.revenue;
+END;
+
+CREATE TRIGGER orders_remove_total
+AFTER DELETE ON orders
+BEGIN
+  UPDATE daily_totals
+  SET orders = orders - 1, revenue = revenue - OLD.amount
+  WHERE day = OLD.placed_on;
+END;
+```
+
+Now use the table normally and watch the triggers work:
+
+```sql
+INSERT INTO orders (id, customer, amount, placed_on) VALUES
+  (1, 'Asha', 500, '2026-11-01'),
+  (2, 'Ravi', 300, '2026-11-01'),
+  (3, 'Asha', 200, '2026-11-02');
+
+UPDATE orders SET status = 'shipped' WHERE id = 1;
+DELETE FROM orders WHERE id = 2;
+
+SELECT order_id, old_status, new_status FROM order_log;
+SELECT * FROM daily_totals ORDER BY day;
+```
+
+| order_id | old_status | new_status |
+| -------: | ---------- | ---------- |
+|        1 | new        | shipped    |
+
+| day        | orders | revenue |
+| ---------- | -----: | ------: |
+| 2026-11-01 |      1 |     500 |
+| 2026-11-02 |      1 |     200 |
+
+And the guard trigger refuses this:
+
+```sql illustration
+UPDATE orders SET status = 'new' WHERE id = 1;
+-- Error: a shipped order cannot go back to new
+```
+
+<Callout type="warning">
+
+Triggers are **hidden logic**. Someone reading `UPDATE orders …` can't see that it also writes two other tables. They slow down bulk loads, since they run once per row, and a missed case (here, an `UPDATE` of `amount` or `placed_on`) leaves the summary quietly wrong. Keep them small, name them clearly, and use them for jobs like audit logs and invariants that must hold whichever app writes the data.
+
+</Callout>
+
+SQLite triggers always run once **per row**. PostgreSQL can also run a trigger once **per statement**, and its triggers call a function instead of holding the SQL inline.
+
+## Stored functions and procedures
+
+A **stored function** is code saved in the database and called from SQL. PostgreSQL lets you write them in SQL or in PL/pgSQL, its own language:
+
+```sql illustration
+-- PostgreSQL
+CREATE FUNCTION customer_total(who text) RETURNS bigint
+LANGUAGE sql STABLE
+AS $$
+  SELECT COALESCE(SUM(amount), 0) FROM orders WHERE customer = who
+$$;
+
+SELECT customer_total('Asha');  -- 700
+```
+
+A **stored procedure** is called with `CALL` and returns nothing. In PostgreSQL 11+ it can `COMMIT` partway through, which is useful for long batch jobs:
+
+```sql illustration
+-- PostgreSQL 11+
+CREATE PROCEDURE archive_shipped()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  INSERT INTO orders_archive SELECT * FROM orders WHERE status = 'shipped';
+  DELETE FROM orders WHERE status = 'shipped';
+  COMMIT;
+END;
+$$;
+
+CALL archive_shipped();
+```
+
+SQLite has neither. Since it runs inside your app, you register functions from your app's language instead, such as `create_function` in Python's `sqlite3`.
+
+<Callout type="info">
+
+Functions in the database run next to the data, so they save round trips. The cost is logic split between two codebases, with the database's version harder to test, review and deploy. Many teams keep business logic in the app and use the database for constraints.
+
+</Callout>
+
+## Materialized views
+
+A normal [view](/beginner/views) is a saved query: it runs every time you read it. A **materialized view** saves the query's **result**, so reads are fast, but the data is only as fresh as the last refresh.
+
+```sql illustration
+-- PostgreSQL
+CREATE MATERIALIZED VIEW daily_revenue AS
+SELECT placed_on AS day, COUNT(*) AS orders, SUM(amount) AS revenue
+FROM orders
+GROUP BY placed_on;
+
+-- Later, recompute it from scratch
+REFRESH MATERIALIZED VIEW daily_revenue;
+```
+
+A plain `REFRESH` locks the view, so reads wait until it finishes. `REFRESH MATERIALIZED VIEW CONCURRENTLY daily_revenue` lets reads carry on, but needs a unique index on the view (`CREATE UNIQUE INDEX ON daily_revenue (day)`) and takes longer.
+
+SQLite and MySQL have no materialized views. The `daily_totals` table above is the usual workaround: a real table kept up to date by triggers.
+
+|                          | View           | Materialized view  | Table + triggers           |
+| ------------------------ | -------------- | ------------------ | -------------------------- |
+| Fresh                    | Always         | As of last refresh | Always                     |
+| Read speed               | Runs the query | Fast               | Fast                       |
+| Cost on writes           | None           | None               | Every insert/update/delete |
+| Cost to bring up to date | —              | Recompute it all   | —                          |
+
+## Words to know
+
+<WordsToKnow>
+
+- **Materialized view**
+  A view whose result is stored, so reading it is fast but it must be refreshed.
+- **NEW / OLD**
+  Inside a trigger, the row after and before the change.
+- **Stored function**
+  Code saved in the database that returns a value and can be called from SQL.
+- **Stored procedure**
+  Code saved in the database, run with CALL, that can control transactions.
+- **Trigger**
+  SQL the database runs automatically before or after rows are inserted, updated or deleted.
+
+</WordsToKnow>
