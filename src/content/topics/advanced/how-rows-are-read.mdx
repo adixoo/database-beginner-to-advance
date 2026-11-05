@@ -1,0 +1,146 @@
+---
+title: How rows are read
+description: How a database finds and reads a row for a SELECT, with an index and without one, in PostgreSQL, MySQL and SQLite.
+level: advanced
+order: 4
+---
+
+import BytesToRow from '@/components/graphics/BytesToRow.astro';
+import FixedSizeJump from '@/components/graphics/FixedSizeJump.astro';
+import FullScanPages from '@/components/graphics/FullScanPages.astro';
+import PageLoad from '@/components/graphics/PageLoad.astro';
+import RecordIdLookup from '@/components/graphics/RecordIdLookup.astro';
+import StepFlow from '@/components/graphics/StepFlow.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+Rows sit in pages ([How rows are stored](/advanced/how-rows-are-stored)), and the column names and types sit in the catalog ([How the schema is stored](/advanced/how-the-schema-is-stored)). Now the trip back: how a `SELECT` finds a row. There are two ways, depending on whether the column in your `WHERE` has an index. These examples use the `notes` table.
+
+## With an index
+
+```sql
+SELECT * FROM notes WHERE id = 3;
+```
+
+`id` is the primary key, so it already has an index. The database answers in three steps:
+
+<StepFlow
+  id="index-read"
+  label="Steps to read a row with an index"
+  title="With an index: find it, load the page, decode the bytes"
+  desc="Step 1: the index gives the page and slot that hold the row. Step 2: load that page from disk into memory, unless it is there already. Step 3: turn the row's bytes back into values, using the schema."
+  steps={[
+    { label: 'find it', caption: ['which page,', 'which slot'] },
+    { label: 'load the page', caption: ['from disk', 'into memory'] },
+    { label: 'decode', caption: ['bytes back', 'into a row'] },
+  ]}
+/>
+
+### Find the row's page and slot
+
+<RecordIdLookup />
+
+1. The [index](/beginner/indexes) on `id` is a sorted list of every `id` with its row's **address**.
+2. The database looks up `3` in the index. Its address is page 0, slot 3.
+3. It jumps to page 0 in the file, then to slot 3 inside it. That is row 3.
+
+The address has a different name in each engine:
+
+| Engine         | A row's address is…                                                                  |
+| -------------- | ------------------------------------------------------------------------------------ |
+| PostgreSQL     | Called `ctid`: the page and slot, as above. See it with `SELECT ctid, * FROM notes;` |
+| MySQL (InnoDB) | The primary key itself, which leads to the right page                                |
+| SQLite         | The `rowid`, which is also the primary key                                           |
+
+All pages are the same size, so finding page `n` takes one multiplication:
+
+<FixedSizeJump />
+
+### Load the page into memory
+
+<PageLoad />
+
+The whole page is copied into memory, the **buffer pool**. If it is already there, no disk read is needed.
+
+### Turn the bytes back into a row
+
+<BytesToRow />
+
+The slot points at the row's bytes, and the schema turns them back into values: `(3, 'Book the trek')`.
+
+## Without an index
+
+```sql
+SELECT * FROM notes WHERE body = 'Book the trek';
+```
+
+`body` has no index, so there is no list of addresses to look in. The database has to read the whole table. This is a **full table scan**:
+
+<StepFlow
+  id="scan-read"
+  label="Steps of a full table scan"
+  title="Without an index: every page, every row"
+  desc="Step 1: load a page from disk into memory. Step 2: decode each row on it and test it against the WHERE. Step 3: move to the next page, until the last page is done."
+  steps={[
+    { label: 'load a page', caption: ['from disk', 'into memory'] },
+    { label: 'check each row', caption: ['decode it, then', 'test the WHERE'] },
+    { label: 'next page', caption: ['until the last', 'one is done'] },
+  ]}
+/>
+
+Here `notes` has grown to three pages:
+
+<FullScanPages />
+
+The database cannot stop at the first match: a row on a later page might match too. With 3 rows this is instant. With a million rows over thousands of pages, every one of those pages is read.
+
+## Which way did the database go?
+
+Ask the database for its plan. Each engine names the two ways differently:
+
+| Engine         | Ask with                      | With an index | Without an index |
+| -------------- | ----------------------------- | ------------- | ---------------- |
+| PostgreSQL     | `EXPLAIN SELECT …`            | `Index Scan`  | `Seq Scan`       |
+| MySQL (InnoDB) | `EXPLAIN SELECT …`            | type `const`  | type `ALL`       |
+| SQLite         | `EXPLAIN QUERY PLAN SELECT …` | `SEARCH`      | `SCAN`           |
+
+Try both queries in SQLite:
+
+```sql
+EXPLAIN QUERY PLAN SELECT * FROM notes WHERE id = 3;
+
+EXPLAIN QUERY PLAN SELECT * FROM notes WHERE body = 'Book the trek';
+```
+
+```text
+SEARCH notes USING INTEGER PRIMARY KEY (rowid=?)
+SCAN notes
+```
+
+Add an index on `body`, and the scan becomes a search:
+
+```sql
+CREATE INDEX idx_notes_body ON notes (body);
+
+EXPLAIN QUERY PLAN SELECT * FROM notes WHERE body = 'Book the trek';
+```
+
+```text
+SEARCH notes USING INDEX idx_notes_body (body=?)
+```
+
+[Choosing indexes well](/advanced/choosing-indexes) covers which columns deserve one.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Buffer pool**
+  The part of memory where a database keeps copies of pages it has read.
+- **Full table scan**
+  Reading every page of a table and checking every row, because no index can help.
+- **Index**
+  A sorted list of a column's values, each with the address of its row.
+- **Row address**
+  What leads the database to one row: a page and slot, or a key.
+
+</WordsToKnow>

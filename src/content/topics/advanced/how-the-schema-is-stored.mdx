@@ -1,0 +1,116 @@
+---
+title: How the schema is stored
+description: Where a database keeps its tables' column names and types, how CREATE TABLE and ALTER TABLE change it, and how every query uses it, in PostgreSQL, MySQL and SQLite.
+level: advanced
+order: 3
+---
+
+import CatalogTables from '@/components/graphics/CatalogTables.astro';
+import StepFlow from '@/components/graphics/StepFlow.astro';
+import WordsToKnow from '@/components/WordsToKnow.astro';
+
+A row on disk holds only its values ([How rows are stored](/advanced/how-rows-are-stored)). The column names and types, the **schema**, are saved separately, once per table, in the **catalog**. These examples use the `notes` table from that topic.
+
+## The catalog: tables about tables
+
+<CatalogTables />
+
+The catalog is a set of tables the database keeps about your tables: one row for each table, and one row for each column. It also notes where each table's pages are.
+
+## What CREATE TABLE does
+
+<StepFlow
+  id="create-table"
+  label="Steps of CREATE TABLE"
+  title="CREATE TABLE only adds rows to the catalog"
+  desc="Step 1: the CREATE TABLE statement is read and checked. Step 2: the database adds one catalog row for the table and one for each column. Step 3: it sets aside a first page for the table's rows."
+  steps={[
+    { label: 'read the SQL', caption: ['CREATE TABLE', 'is checked'] },
+    { label: 'add catalog rows', caption: ['one for the table,', 'one per column'] },
+    { label: 'make room', caption: ['a first page', 'for its rows'] },
+  ]}
+/>
+
+No rows of yours are saved yet. Only the catalog changes.
+
+## Where each engine keeps it
+
+| Engine         | Where the schema is saved                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| PostgreSQL     | Catalog tables such as `pg_class` (one row per table) and `pg_attribute` (one row per column) |
+| MySQL (InnoDB) | A hidden **data dictionary**, made of InnoDB tables                                           |
+| SQLite         | One table, `sqlite_schema`, on the first page of the file                                     |
+
+In PostgreSQL and MySQL, read it through `information_schema`, a set of views every SQL database is meant to offer:
+
+```sql illustration
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'notes';
+```
+
+```text
+ column_name | data_type
+-------------+-----------
+ id          | integer
+ body        | text
+```
+
+SQLite saves the `CREATE TABLE` text itself, and reads it again each time it opens the file:
+
+```sql
+SELECT type, name, rootpage, sql FROM sqlite_schema WHERE name = 'notes';
+```
+
+| type  | name  | rootpage | sql                                                      |
+| ----- | ----- | -------: | -------------------------------------------------------- |
+| table | notes |        2 | `CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)` |
+
+`rootpage` is where the table's pages start: `notes` begins on page 2.
+
+## Changing the schema
+
+`ALTER TABLE` changes catalog rows, too:
+
+```sql
+ALTER TABLE notes ADD COLUMN done INTEGER DEFAULT 0;
+
+SELECT sql FROM sqlite_schema WHERE name = 'notes';
+```
+
+```text
+CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT, done INTEGER DEFAULT 0)
+```
+
+Adding a column like this rewrites none of your rows, in any of the three engines. Old rows are simply one value short, and the database fills in the default from the catalog when it reads them.
+
+## How every query uses it
+
+<StepFlow
+  id="read-with-schema"
+  label="Steps of a query using the schema"
+  title="Every query starts in the catalog"
+  desc="Step 1: look up the table in the catalog, to learn its columns and types and where its pages are. Step 2: find the row in the table's pages. Step 3: turn the row's bytes back into values, using the column types."
+  steps={[
+    { label: 'look up notes', caption: ['in the catalog:', 'columns, types'] },
+    { label: 'find the row', caption: ["in the table's", 'pages'] },
+    { label: 'decode', caption: ['bytes into values,', 'by column type'] },
+  ]}
+/>
+
+Every query starts in the catalog, so the database keeps it in memory instead of reading it from disk each time. [How rows are read](/advanced/how-rows-are-read) shows the next two steps.
+
+## Words to know
+
+<WordsToKnow>
+
+- **Catalog**
+  The tables a database keeps about its own tables, columns and types.
+- **Data dictionary**
+  MySQL's name for its catalog.
+- **information_schema**
+  Standard views for reading the catalog, in PostgreSQL and MySQL.
+- **Schema**
+  A table's column names and types, saved once.
+
+</WordsToKnow>

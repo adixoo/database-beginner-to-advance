@@ -1,11 +1,11 @@
 ---
-// A table as the database stores it: the notes grid on top, and below it the file notes.db, one
-// long run of bytes cut into equal 4 KB pages. A mint arrow takes the rows to page 1 (peach);
-// byte offsets under the pages show that page n starts at n × 4096. Below ~520px it scrolls
+// A table as the database stores it: the notes grid on top, and below it the table's file, one
+// long run of bytes cut into equal 8 KB pages, as in PostgreSQL. A mint arrow takes the rows to page 1 (peach);
+// byte offsets under the pages show that page n starts at n × 8192. Below ~520px it scrolls
 // sideways.
 import SvgTable from './SvgTable.astro';
 
-const PAGE_SIZE = 4096;
+const PAGE_SIZE = 8192;
 const PAGE_COUNT = 4;
 const ROWS_PAGE = 1;
 const STRIP_X = 10;
@@ -37,8 +37,8 @@ const pages = Array.from({ length: PAGE_COUNT }, (_, n) => ({
 			<title id="tp-title">A table is stored as a file cut into equal pages</title>
 			<desc id="tp-desc">
 				The notes table has three rows: Buy milk, Call Ravi and Book the trek. On disk it lives in
-				the file notes.db, one long run of bytes cut into 4 KB pages: page 0 starts at byte 0, page
-				1 at byte 4096, page 2 at 8192 and page 3 at 12288. The three rows sit in page 1.
+				the table's file, one long run of bytes cut into 8 KB pages: page 0 starts at byte 0, page 1
+				at byte 8192, page 2 at 16384 and page 3 at 24576. The three rows sit in page 1.
 			</desc>
 
 			<SvgTable
@@ -65,7 +65,7 @@ const pages = Array.from({ length: PAGE_COUNT }, (_, n) => ({
 				font-family="var(--font-sans)"
 				font-size="17"
 				font-weight="700"
-				fill="var(--color-ink)">notes.db</text
+				fill="var(--color-ink)">the table's file</text
 			>
 			{
 				pages.map((page) => {
@@ -99,7 +99,7 @@ const pages = Array.from({ length: PAGE_COUNT }, (_, n) => ({
 								font-size="14"
 								fill="var(--color-ink-muted)"
 							>
-								4 KB
+								8 KB
 							</text>
 							<line
 								x1={page.x}

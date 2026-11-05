@@ -1,72 +1,99 @@
 ---
-// Following a record id: PostgreSQL's ctid (0, 3) names page 0 (peach) and slot 3 (sky). The
-// database jumps to page 0 of the file, reads slot 3 in it, and follows the slot to row 3.
-// Below ~540px it scrolls sideways.
+// Finding a row, starting from the query: SELECT … WHERE id = 3 looks up 3 in the index on id.
+// The index gives the row's address, page 0 (peach) and slot 3 (sky). The database jumps to page
+// 0 of the file and, inside it, straight to slot 3 and its row. The page is drawn the same simple
+// way as PageWithRows. Below ~540px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+const QUERY = { x: 10, y: 14, width: 330, height: 44 };
+const INDEX = { x: 10, y: 110, width: 210 };
+const TARGET_INDEX_ROW = 2;
+// Centre of the index row for id 3, from SvgTable's layout
+const indexRowCentre = INDEX.y + 70 + TARGET_INDEX_ROW * 44;
 
 const PAGES = [0, 1, 2];
 const TARGET_PAGE = 0;
-const COLUMN = { x: 200, y: 44, width: 120, height: 44, gap: 8 };
-const ZOOM = { x: 370, y: 44, width: 260, height: 256 };
-const SLOT = { y: 98, width: 70, height: 34 };
-const SLOT_XS = [382, 456, 530];
-const TARGET_SLOT = 2;
-const ROW = { y: 236, height: 48 };
-
-// Written from the end of the page backwards
-const ROWS = [
-	{ label: 'row 1', x: 552, width: 66 },
-	{ label: 'row 2', x: 482, width: 66 },
-	{ label: 'row 3', x: 386, width: 92 },
-];
-
+const COLUMN = { x: 250, y: 110, width: 120, height: 44, gap: 8 };
 const pageY = (n: number): number => COLUMN.y + n * (COLUMN.height + COLUMN.gap);
-const slotCentre = SLOT_XS[TARGET_SLOT] + SLOT.width / 2;
-const targetRow = ROWS[TARGET_SLOT];
-const rowCentre = targetRow.x + targetRow.width / 2;
-const pointerStart = SLOT.y + SLOT.height + 2;
-const pointerEnd = ROW.y - 4;
+
+const ZOOM = { x: 400, y: 110, width: 230, height: 194 };
+const HEADER = { x: 412, y: 122, width: 206, height: 30 };
+const ROW_TOP = 164;
+const ROW_HEIGHT = 40;
+const ROW_GAP = 8;
+const SLOT_X = 412;
+const SLOT_WIDTH = 62;
+const ROW_X = 480;
+const ROW_WIDTH = 138;
+const TARGET_SLOT = 3;
+const ROWS = ['row 1', 'row 2', 'row 3'];
+const rowY = (index: number): number => ROW_TOP + index * (ROW_HEIGHT + ROW_GAP);
 ---
 
 <figure class="not-prose my-10">
 	<div class="overflow-x-auto" role="region" aria-label="Record id lookup diagram" tabindex="0">
 		<svg
-			viewBox="0 0 640 320"
+			viewBox="0 0 640 352"
 			class="w-full min-w-[540px]"
 			role="img"
 			aria-labelledby="ri-title ri-desc"
 		>
-			<title id="ri-title">A record id is a page number and a slot</title>
+			<title id="ri-title">From the query to the row: index, address, page, slot</title>
 			<desc id="ri-desc">
-				The PostgreSQL record id (0, 3) means page 0, slot 3. The database jumps to page 0 of the
-				file, without reading pages 1 or 2, then reads slot 3 in that page, which points at row 3.
+				The query SELECT * FROM notes WHERE id = 3 looks up 3 in the index on id. The index lists
+				each id with its row's address: 1 is at page 0 slot 1, 2 at page 0 slot 2, and 3 at page 0
+				slot 3. The database jumps to page 0 of the file, without reading pages 1 or 2, and inside
+				it goes straight to slot 3, which holds row 3.
 			</desc>
 
 			<g font-family="var(--font-sans)">
-				<!-- The record id -->
-				<text x="14" y="30" font-size="17" font-weight="700" fill="var(--color-ink)">ctid</text>
-				<rect x="10" y={COLUMN.y} width="140" height="56" rx="12" fill="var(--color-raised)"></rect>
+				<!-- The query -->
+				<rect
+					x={QUERY.x}
+					y={QUERY.y}
+					width={QUERY.width}
+					height={QUERY.height}
+					rx="10"
+					fill="var(--color-raised)"></rect>
 				<text
-					x="80"
-					y={COLUMN.y + 37}
-					text-anchor="middle"
+					x={QUERY.x + 16}
+					y={QUERY.y + 28}
 					font-family="var(--font-mono)"
-					font-size="26"
+					font-size="15"
 					fill="var(--color-ink)"
-					>(<tspan fill="var(--color-peach)" font-weight="700">0</tspan>, <tspan
-						fill="var(--color-sky)"
-						font-weight="700">3</tspan
-					>)</text
+					><tspan fill="var(--color-lilac)">SELECT</tspan> * <tspan fill="var(--color-lilac)"
+						>FROM</tspan
+					> notes <tspan fill="var(--color-lilac)">WHERE</tspan> id = 3</text
 				>
-				<text x="56" y={COLUMN.y + 80} text-anchor="middle" font-size="14" fill="var(--color-peach)"
-					>page</text
-				>
-				<text x="103" y={COLUMN.y + 80} text-anchor="middle" font-size="14" fill="var(--color-sky)"
-					>slot</text
-				>
+			</g>
 
+			<!-- The index: each id with its row's address -->
+			<SvgTable
+				name="index on id"
+				x={INDEX.x}
+				y={INDEX.y}
+				width={INDEX.width}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'address', x: 70, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'page 0, slot 1'],
+					['2', 'page 0, slot 2'],
+					['3', 'page 0, slot 3'],
+				]}
+				keyTint={{ x: 20, width: 36 }}
+				linkedRows={[TARGET_INDEX_ROW]}
+			/>
+
+			<g font-family="var(--font-sans)">
 				<!-- The file: page 0 is the one to read -->
-				<text x={COLUMN.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
-					>the file</text
+				<text
+					x={COLUMN.x + 4}
+					y={COLUMN.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">the file</text
 				>
 				{
 					PAGES.map((n) => {
@@ -107,8 +134,12 @@ const pointerEnd = ROW.y - 4;
 						x2={ZOOM.x}
 						y2={ZOOM.y + ZOOM.height}></line>
 				</g>
-				<text x={ZOOM.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
-					>page 0</text
+				<text
+					x={ZOOM.x + 4}
+					y={ZOOM.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">page 0</text
 				>
 				<rect
 					x={ZOOM.x}
@@ -117,18 +148,27 @@ const pointerEnd = ROW.y - 4;
 					height={ZOOM.height}
 					rx="14"
 					fill="var(--color-surface)"></rect>
-				<rect x="382" y="56" width="236" height="30" rx="8" fill="var(--color-raised)"></rect>
-				<text x="394" y="76" font-size="13" fill="var(--color-ink-muted)">header</text>
+				<rect
+					x={HEADER.x}
+					y={HEADER.y}
+					width={HEADER.width}
+					height={HEADER.height}
+					rx="8"
+					fill="var(--color-raised)"></rect>
+				<text x={HEADER.x + 12} y={HEADER.y + 20} font-size="13" fill="var(--color-ink-muted)"
+					>page header</text
+				>
 				{
-					SLOT_XS.map((x, index) => {
-						const isTarget = index === TARGET_SLOT;
+					ROWS.map((label, index) => {
+						const isTarget = index + 1 === TARGET_SLOT;
+						const y = rowY(index);
 						return (
 							<g>
 								<rect
-									x={x}
-									y={SLOT.y}
-									width={SLOT.width}
-									height={SLOT.height}
+									x={SLOT_X}
+									y={y}
+									width={SLOT_WIDTH}
+									height={ROW_HEIGHT}
 									rx="8"
 									fill={isTarget ? 'var(--color-sky)' : 'var(--color-raised)'}
 									fill-opacity={isTarget ? 0.14 : 1}
@@ -136,8 +176,8 @@ const pointerEnd = ROW.y - 4;
 									stroke-width="2"
 								/>
 								<text
-									x={x + SLOT.width / 2}
-									y={SLOT.y + 22}
+									x={SLOT_X + SLOT_WIDTH / 2}
+									y={y + 25}
 									text-anchor="middle"
 									font-family="var(--font-mono)"
 									font-size="13"
@@ -145,20 +185,11 @@ const pointerEnd = ROW.y - 4;
 								>
 									slot {index + 1}
 								</text>
-							</g>
-						);
-					})
-				}
-				{
-					ROWS.map((row, index) => {
-						const isTarget = index === TARGET_SLOT;
-						return (
-							<g>
 								<rect
-									x={row.x}
-									y={ROW.y}
-									width={row.width}
-									height={ROW.height}
+									x={ROW_X}
+									y={y}
+									width={ROW_WIDTH}
+									height={ROW_HEIGHT}
 									rx="8"
 									fill={isTarget ? 'var(--color-peach)' : 'var(--color-raised)'}
 									fill-opacity={isTarget ? 0.1 : 1}
@@ -166,14 +197,13 @@ const pointerEnd = ROW.y - 4;
 									stroke-width="2"
 								/>
 								<text
-									x={row.x + row.width / 2}
-									y={ROW.y + 29}
-									text-anchor="middle"
+									x={ROW_X + 14}
+									y={y + 25}
 									font-size="14"
 									font-weight={isTarget ? 600 : 400}
 									fill={isTarget ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
 								>
-									{row.label}
+									{label}
 								</text>
 							</g>
 						);
@@ -181,7 +211,6 @@ const pointerEnd = ROW.y - 4;
 				}
 			</g>
 
-			<!-- The jumps: ctid to page 0, slot 3 to its row -->
 			<g
 				fill="none"
 				stroke-width="3"
@@ -189,18 +218,39 @@ const pointerEnd = ROW.y - 4;
 				stroke-linejoin="round"
 				aria-hidden="true"
 			>
-				<g stroke="var(--color-peach)">
-					<path d="M154 70 C 170 66, 182 66, 194 66"></path>
-					<path d="M194 66 l-9 -6.3 M194 66 l-9 6.3"></path>
+				<!-- The query looks up 3 in the index -->
+				<g stroke="var(--color-lilac)">
+					<path d="M160 62 C 162 72, 158 80, 160 88"></path>
+					<path d="M160 88 l-6.3 -9 M160 88 l6.3 -9"></path>
 				</g>
-				<g stroke="var(--color-sky)">
-					<path
-						d={`M${slotCentre} ${pointerStart} C ${slotCentre} 190, ${rowCentre} 180, ${rowCentre} ${pointerEnd}`}
-					></path>
-					<path d={`M${rowCentre} ${pointerEnd} l-6.3 -9 M${rowCentre} ${pointerEnd} l6.3 -9`}
-					></path>
+				<!-- The address leads to page 0 -->
+				<g stroke="var(--color-peach)">
+					<path d={`M224 ${indexRowCentre} C 236 ${indexRowCentre - 40}, 230 140, 246 132`}></path>
+					<path d="M246 132 l-10.3 -3.2 M246 132 l-4.3 10.1"></path>
 				</g>
 			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M114 330 C 112 322, 116 316, 114 310"></path>
+				<path d="M114 310 l-6.3 9 M114 310 l6.3 9"></path>
+			</g>
+			<text
+				x="14"
+				y="348"
+				font-family="var(--font-hand)"
+				font-size="20"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">the index gives the address</text
+			>
 		</svg>
 	</div>
 </figure>

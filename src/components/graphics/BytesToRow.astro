@@ -1,0 +1,197 @@
+---
+// Reading a row back, the reverse of RowToBytes: the bytes slot 3 points at (header in sky, id
+// in mint, then the body one byte per letter) become a row of the notes table again (sky
+// arrow). The schema (lilac) says which value is which. Below ~520px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+const BODY = 'Book the trek';
+const STRIP_Y = 50;
+const CELL_HEIGHT = 40;
+const HEADER_CELL = { x: 10, width: 96 };
+const ID_CELL = { x: 110, width: 40 };
+const CHAR_X = 154;
+const CHAR_WIDTH = 30;
+const CHAR_STEP = 33;
+const LABEL_Y = STRIP_Y + CELL_HEIGHT + 22;
+
+const RESULT = { x: 10, y: 180, width: 300 };
+const SCHEMA = { x: 380, y: 180, width: 250, height: 56 };
+
+const chars = [...BODY].map((char, index) => ({
+	char: char === ' ' ? '·' : char,
+	isSpace: char === ' ',
+	x: CHAR_X + index * CHAR_STEP,
+}));
+const bodyCentre = CHAR_X + ((chars.length - 1) * CHAR_STEP + CHAR_WIDTH) / 2;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Bytes to row diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 310"
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby="br-title br-desc"
+		>
+			<title id="br-title">The schema turns a row's bytes back into values</title>
+			<desc id="br-desc">
+				Slot 3 points at row 3's bytes: a header, then 3, then the letters of Book the trek. Using
+				the schema, id INTEGER and body TEXT, the database turns them back into a row of the notes
+				table: id 3, body Book the trek.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- The bytes -->
+				<text x="14" y={STRIP_Y - 14} font-size="17" font-weight="700" fill="var(--color-ink)"
+					>row 3's bytes, found through slot 3</text
+				>
+				<rect
+					x={HEADER_CELL.x}
+					y={STRIP_Y}
+					width={HEADER_CELL.width}
+					height={CELL_HEIGHT}
+					rx="8"
+					fill="var(--color-sky)"
+					fill-opacity="0.14"
+					stroke="var(--color-sky)"
+					stroke-width="2"></rect>
+				<text
+					x={HEADER_CELL.x + HEADER_CELL.width / 2}
+					y={STRIP_Y + 25}
+					text-anchor="middle"
+					font-size="14"
+					fill="var(--color-ink)">header</text
+				>
+				<rect
+					x={ID_CELL.x}
+					y={STRIP_Y}
+					width={ID_CELL.width}
+					height={CELL_HEIGHT}
+					rx="8"
+					fill="var(--color-mint)"
+					fill-opacity="0.16"></rect>
+				<text
+					x={ID_CELL.x + ID_CELL.width / 2}
+					y={STRIP_Y + 26}
+					text-anchor="middle"
+					font-family="var(--font-mono)"
+					font-size="15"
+					font-weight="600"
+					fill="var(--color-mint)">3</text
+				>
+				{
+					chars.map((cell) => (
+						<g>
+							<rect
+								x={cell.x}
+								y={STRIP_Y}
+								width={CHAR_WIDTH}
+								height={CELL_HEIGHT}
+								rx="6"
+								fill="var(--color-raised)"
+							/>
+							<text
+								x={cell.x + CHAR_WIDTH / 2}
+								y={STRIP_Y + 26}
+								text-anchor="middle"
+								font-family="var(--font-mono)"
+								font-size="15"
+								fill={cell.isSpace ? 'var(--color-ink-muted)' : 'var(--color-ink)'}
+							>
+								{cell.char}
+							</text>
+						</g>
+					))
+				}
+				<g font-size="13" fill="var(--color-ink-muted)" text-anchor="middle">
+					<text x={HEADER_CELL.x + HEADER_CELL.width / 2} y={LABEL_Y}>sizes, NULLs</text>
+					<text x={ID_CELL.x + ID_CELL.width / 2} y={LABEL_Y}>id</text>
+					<text x={bodyCentre} y={LABEL_Y}>body</text>
+				</g>
+
+				<!-- The schema -->
+				<text
+					x={SCHEMA.x + 4}
+					y={SCHEMA.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">schema</text
+				>
+				<rect
+					x={SCHEMA.x}
+					y={SCHEMA.y}
+					width={SCHEMA.width}
+					height={SCHEMA.height}
+					rx="10"
+					fill="var(--color-lilac)"
+					fill-opacity="0.14"
+					stroke="var(--color-lilac)"
+					stroke-width="2"></rect>
+				<text
+					x={SCHEMA.x + 16}
+					y={SCHEMA.y + 34}
+					font-family="var(--font-mono)"
+					font-size="15"
+					fill="var(--color-ink)">id INTEGER, body TEXT</text
+				>
+			</g>
+
+			<!-- Back to a row -->
+			<SvgTable
+				name="notes"
+				x={RESULT.x}
+				y={RESULT.y}
+				width={RESULT.width}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'body', x: 72, anchor: 'start' },
+				]}
+				rows={[['3', 'Book the trek']]}
+				keyTint={{ x: 20, width: 36 }}
+				linkedRows={[0]}
+			/>
+
+			<g
+				fill="none"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<!-- Bytes down to the row -->
+				<g stroke="var(--color-sky)">
+					<path d="M160 122 C 162 138, 158 150, 160 162"></path>
+					<path d="M160 162 l-6.3 -9 M160 162 l6.3 -9"></path>
+				</g>
+				<!-- The schema names each value -->
+				<g stroke="var(--color-lilac)">
+					<path d="M376 208 C 352 208, 336 220, 318 228"></path>
+					<path d="M318 228 l10.7 -1.8 M318 228 l6.5 -8.6"></path>
+				</g>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M505 268 C 507 258, 503 250, 505 242"></path>
+				<path d="M505 242 l-6.3 9 M505 242 l6.3 9"></path>
+			</g>
+			<text
+				x="505"
+				y="296"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">says which value is which</text
+			>
+		</svg>
+	</div>
+</figure>

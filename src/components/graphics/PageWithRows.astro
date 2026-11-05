@@ -1,0 +1,224 @@
+---
+// A page, kept simple: a header on top, then each row's bytes one under another (header in sky,
+// id in mint, then the body), each with its numbered slot (sky), and free space below for new
+// rows. Below ~540px it scrolls sideways.
+
+interface Row {
+	id: string;
+	body: string;
+}
+
+const ROWS: Row[] = [
+	{ id: '1', body: 'Buy milk' },
+	{ id: '2', body: 'Call Ravi' },
+	{ id: '3', body: 'Book the trek' },
+];
+
+const PAGE = { x: 10, y: 40, width: 460, height: 244 };
+const INNER_X = 26;
+const INNER_WIDTH = 428;
+const HEADER = { y: 56, height: 34 };
+const ROW_TOP = 102;
+const ROW_HEIGHT = 36;
+const ROW_GAP = 8;
+const SLOT_WIDTH = 74;
+const BYTES_X = INNER_X + SLOT_WIDTH + 8;
+const SEGMENT_GAP = 3;
+const ROW_HEADER_WIDTH = 70;
+const ID_WIDTH = 36;
+const BODY_X = BYTES_X + ROW_HEADER_WIDTH + ID_WIDTH + 2 * SEGMENT_GAP;
+const BODY_WIDTH = INNER_X + INNER_WIDTH - BODY_X;
+
+const rowY = (index: number): number => ROW_TOP + index * (ROW_HEIGHT + ROW_GAP);
+const FREE_Y = rowY(ROWS.length);
+const FREE_HEIGHT = PAGE.y + PAGE.height - 14 - FREE_Y;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Page with rows diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 300"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="pr-title pr-desc"
+		>
+			<title id="pr-title">A page holds a header, then rows, then free space</title>
+			<desc id="pr-desc">
+				Page 1 starts with a page header that says how many rows it holds. Then come the three rows'
+				bytes, one under another, each with a numbered slot: slot 1 holds 1, Buy milk; slot 2 holds
+				2, Call Ravi; slot 3 holds 3, Book the trek. The rest of the page is free space, where new
+				rows go.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<text
+					x={PAGE.x + 4}
+					y={PAGE.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">page 1</text
+				>
+				<rect
+					x={PAGE.x}
+					y={PAGE.y}
+					width={PAGE.width}
+					height={PAGE.height}
+					rx="14"
+					fill="var(--color-surface)"></rect>
+
+				<!-- Page header -->
+				<rect
+					x={INNER_X}
+					y={HEADER.y}
+					width={INNER_WIDTH}
+					height={HEADER.height}
+					rx="8"
+					fill="var(--color-raised)"></rect>
+				<text
+					x={INNER_X + 14}
+					y={HEADER.y + 22}
+					font-size="14"
+					font-weight="600"
+					fill="var(--color-ink)">page header</text
+				>
+				<text
+					x={INNER_X + INNER_WIDTH - 14}
+					y={HEADER.y + 22}
+					text-anchor="end"
+					font-size="13"
+					fill="var(--color-ink-muted)">3 rows, room for more</text
+				>
+
+				<!-- Rows, each with its slot -->
+				{
+					ROWS.map((row, index) => {
+						const y = rowY(index);
+						const textY = y + 23;
+						return (
+							<g>
+								<rect
+									x={INNER_X}
+									y={y}
+									width={SLOT_WIDTH}
+									height={ROW_HEIGHT}
+									rx="8"
+									fill="var(--color-sky)"
+									fill-opacity="0.14"
+									stroke="var(--color-sky)"
+									stroke-width="2"
+								/>
+								<text
+									x={INNER_X + SLOT_WIDTH / 2}
+									y={textY}
+									text-anchor="middle"
+									font-family="var(--font-mono)"
+									font-size="13"
+									fill="var(--color-ink)"
+								>
+									slot {index + 1}
+								</text>
+								<rect
+									x={BYTES_X}
+									y={y}
+									width={ROW_HEADER_WIDTH}
+									height={ROW_HEIGHT}
+									rx="8"
+									fill="var(--color-sky)"
+									fill-opacity="0.14"
+								/>
+								<text
+									x={BYTES_X + ROW_HEADER_WIDTH / 2}
+									y={textY}
+									text-anchor="middle"
+									font-size="13"
+									fill="var(--color-ink-soft)"
+								>
+									header
+								</text>
+								<rect
+									x={BYTES_X + ROW_HEADER_WIDTH + SEGMENT_GAP}
+									y={y}
+									width={ID_WIDTH}
+									height={ROW_HEIGHT}
+									rx="8"
+									fill="var(--color-mint)"
+									fill-opacity="0.16"
+								/>
+								<text
+									x={BYTES_X + ROW_HEADER_WIDTH + SEGMENT_GAP + ID_WIDTH / 2}
+									y={textY}
+									text-anchor="middle"
+									font-family="var(--font-mono)"
+									font-size="14"
+									font-weight="600"
+									fill="var(--color-mint)"
+								>
+									{row.id}
+								</text>
+								<rect
+									x={BODY_X}
+									y={y}
+									width={BODY_WIDTH}
+									height={ROW_HEIGHT}
+									rx="8"
+									fill="var(--color-raised)"
+								/>
+								<text
+									x={BODY_X + 14}
+									y={textY}
+									font-family="var(--font-mono)"
+									font-size="14"
+									fill="var(--color-ink)"
+								>
+									{row.body}
+								</text>
+							</g>
+						);
+					})
+				}
+
+				<!-- Free space -->
+				<rect
+					x={INNER_X}
+					y={FREE_Y}
+					width={INNER_WIDTH}
+					height={FREE_HEIGHT}
+					rx="8"
+					fill="none"
+					stroke="var(--color-gray-600)"
+					stroke-width="2"
+					stroke-dasharray="6 6"></rect>
+				<text
+					x={INNER_X + INNER_WIDTH / 2}
+					y={FREE_Y + FREE_HEIGHT / 2 + 5}
+					text-anchor="middle"
+					font-size="14"
+					fill="var(--color-ink-muted)">free space</text
+				>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M500 236 C 494 244, 486 250, 476 252"></path>
+				<path d="M476 252 l8.7 -6.4 M476 252 l10 4.2"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="20"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="490" y="204">new rows</text>
+				<text x="490" y="228">go here</text>
+			</g>
+		</svg>
+	</div>
+</figure>

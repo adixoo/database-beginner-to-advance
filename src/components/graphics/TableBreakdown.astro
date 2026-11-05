@@ -1,0 +1,175 @@
+---
+// A table broken down: the notes grid on the left, and what the database actually keeps on the
+// right. The column list (lilac) is stored once as the schema; each row (peach) is stored on
+// its own as a tuple of values in column order. Below ~540px it scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+const TABLE = { x: 10, y: 50, width: 250 };
+// Centres of the table's header and rows, from SvgTable's layout
+const HEADER_CENTRE = TABLE.y + 24;
+const rowCentre = (index: number): number => TABLE.y + 70 + index * 44;
+
+const RIGHT_X = 360;
+const RIGHT_WIDTH = 270;
+const SCHEMA = { y: 50, height: 48 };
+const TUPLE_TOP = 160;
+const TUPLE_HEIGHT = 36;
+const TUPLE_GAP = 8;
+const ARROW_FROM = TABLE.x + TABLE.width + 4;
+const ARROW_TO = RIGHT_X - 6;
+
+const TUPLES = ["(1, 'Buy milk')", "(2, 'Call Ravi')", "(3, 'Book the trek')"];
+const tupleY = (index: number): number => TUPLE_TOP + index * (TUPLE_HEIGHT + TUPLE_GAP);
+const tupleCentre = (index: number): number => tupleY(index) + TUPLE_HEIGHT / 2;
+const arrowHead = (y: number): string => `M${ARROW_TO} ${y} l-9 -6.3 M${ARROW_TO} ${y} l-9 6.3`;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Table breakdown diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 310"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="tb-title tb-desc"
+		>
+			<title id="tb-title">A table is stored as one schema plus one tuple per row</title>
+			<desc id="tb-desc">
+				The notes table looks like a grid with columns id and body and three rows. The database
+				splits it in two: the schema, id INTEGER and body TEXT, stored once; and each row stored on
+				its own as a tuple of values: (1, 'Buy milk'), (2, 'Call Ravi') and (3, 'Book the trek').
+			</desc>
+
+			<SvgTable
+				name="notes"
+				x={TABLE.x}
+				y={TABLE.y}
+				width={TABLE.width}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'body', x: 72, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'Buy milk'],
+					['2', 'Call Ravi'],
+					['3', 'Book the trek'],
+				]}
+				keyTint={{ x: 20, width: 36 }}
+			/>
+
+			<g font-family="var(--font-sans)">
+				<!-- The schema, kept once -->
+				<text
+					x={RIGHT_X + 4}
+					y={SCHEMA.y - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">schema: kept once</text
+				>
+				<rect
+					x={RIGHT_X}
+					y={SCHEMA.y}
+					width={RIGHT_WIDTH}
+					height={SCHEMA.height}
+					rx="10"
+					fill="var(--color-lilac)"
+					fill-opacity="0.14"
+					stroke="var(--color-lilac)"
+					stroke-width="2"></rect>
+				<text
+					x={RIGHT_X + 16}
+					y={SCHEMA.y + 30}
+					font-family="var(--font-mono)"
+					font-size="15"
+					fill="var(--color-ink)">id INTEGER, body TEXT</text
+				>
+
+				<!-- The rows, one tuple each -->
+				<text
+					x={RIGHT_X + 4}
+					y={TUPLE_TOP - 14}
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-ink)">rows: one tuple each</text
+				>
+				{
+					TUPLES.map((tuple, index) => (
+						<g>
+							<rect
+								x={RIGHT_X}
+								y={tupleY(index)}
+								width={RIGHT_WIDTH}
+								height={TUPLE_HEIGHT}
+								rx="10"
+								fill="var(--color-peach)"
+								fill-opacity="0.1"
+								stroke="var(--color-peach)"
+								stroke-width="2"
+							/>
+							<text
+								x={RIGHT_X + 16}
+								y={tupleY(index) + 24}
+								font-family="var(--font-mono)"
+								font-size="15"
+								fill="var(--color-ink)"
+							>
+								{tuple}
+							</text>
+						</g>
+					))
+				}
+			</g>
+
+			<!-- Header to schema, rows to tuples -->
+			<g
+				fill="none"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<g stroke="var(--color-lilac)">
+					<path d={`M${ARROW_FROM} ${HEADER_CENTRE} L ${ARROW_TO} ${HEADER_CENTRE}`}></path>
+					<path d={arrowHead(HEADER_CENTRE)}></path>
+				</g>
+				<g stroke="var(--color-peach)">
+					{
+						TUPLES.map((_, index) => {
+							const from = rowCentre(index);
+							const to = tupleCentre(index);
+							return (
+								<Fragment>
+									<path
+										d={`M${ARROW_FROM} ${from} C ${ARROW_FROM + 36} ${from}, ${ARROW_TO - 36} ${to}, ${ARROW_TO} ${to}`}
+									/>
+									<path d={arrowHead(to)} />
+								</Fragment>
+							);
+						})
+					}
+				</g>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M120 276 C 122 268, 118 262, 120 254"></path>
+				<path d="M120 254 l-6.3 9 M120 254 l6.3 9"></path>
+			</g>
+			<text
+				x="14"
+				y="300"
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">the grid is just for display</text
+			>
+		</svg>
+	</div>
+</figure>

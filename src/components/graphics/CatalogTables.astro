@@ -1,0 +1,134 @@
+---
+// Where the schema lives: the notes table on the left holds only values, and the catalog on the
+// right holds its description as rows of two more tables, one row per table and one row per
+// column (peach). Lilac arrows link the notes header to its catalog rows. Below ~540px it
+// scrolls sideways.
+import SvgTable from './SvgTable.astro';
+
+const NOTES = { x: 10, y: 50, width: 230 };
+const CATALOG_X = 300;
+const CATALOG_WIDTH = 330;
+const TABLES_Y = 50;
+const COLUMNS_Y = 200;
+
+// Centres used by the arrows, from SvgTable's layout (header 24 below the top, rows 44 apart)
+const NOTES_HEADER = NOTES.y + 24;
+const TABLES_ROW = TABLES_Y + 70;
+const COLUMNS_ROWS = [COLUMNS_Y + 70, COLUMNS_Y + 114];
+const ARROW_FROM = NOTES.x + NOTES.width + 4;
+const ARROW_TO = CATALOG_X - 6;
+const head = (y: number): string => `M${ARROW_TO} ${y} l-9 -6.3 M${ARROW_TO} ${y} l-9 6.3`;
+const curve = (to: number): string =>
+	`M${ARROW_FROM} ${NOTES_HEADER} C ${ARROW_FROM + 30} ${NOTES_HEADER}, ${ARROW_TO - 30} ${to}, ${ARROW_TO} ${to}`;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Catalog tables diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 380"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="ct-title ct-desc"
+		>
+			<title id="ct-title">The schema is saved as rows in the catalog's own tables</title>
+			<desc id="ct-desc">
+				The notes table holds only values: 1 Buy milk, 2 Call Ravi, 3 Book the trek. Its schema is
+				saved in the catalog, which is made of tables too. The catalog's tables table has one row
+				for notes, with 2 columns. Its columns table has one row per column: notes, id, INTEGER,
+				first; and notes, body, TEXT, second.
+			</desc>
+
+			<SvgTable
+				name="notes"
+				x={NOTES.x}
+				y={NOTES.y}
+				width={NOTES.width}
+				columns={[
+					{ label: 'id', x: 46, anchor: 'end', key: true },
+					{ label: 'body', x: 72, anchor: 'start' },
+				]}
+				rows={[
+					['1', 'Buy milk'],
+					['2', 'Call Ravi'],
+					['3', 'Book the trek'],
+				]}
+				keyTint={{ x: 20, width: 36 }}
+			/>
+
+			<!-- The catalog: one row per table, one row per column -->
+			<SvgTable
+				name="catalog: tables"
+				x={CATALOG_X}
+				y={TABLES_Y}
+				width={CATALOG_WIDTH}
+				columns={[
+					{ label: 'name', x: 316, anchor: 'start' },
+					{ label: 'columns', x: 614, anchor: 'end' },
+				]}
+				rows={[['notes', '2']]}
+				linkedRows={[0]}
+			/>
+			<SvgTable
+				name="catalog: columns"
+				x={CATALOG_X}
+				y={COLUMNS_Y}
+				width={CATALOG_WIDTH}
+				columns={[
+					{ label: 'table', x: 316, anchor: 'start' },
+					{ label: 'column', x: 396, anchor: 'start' },
+					{ label: 'type', x: 476, anchor: 'start' },
+					{ label: 'order', x: 614, anchor: 'end' },
+				]}
+				rows={[
+					['notes', 'id', 'INTEGER', '1'],
+					['notes', 'body', 'TEXT', '2'],
+				]}
+				linkedRows={[0, 1]}
+			/>
+
+			<!-- The notes header, described by catalog rows -->
+			<g
+				fill="none"
+				stroke="var(--color-lilac)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d={curve(TABLES_ROW)}></path>
+				<path d={head(TABLES_ROW)}></path>
+				{
+					COLUMNS_ROWS.map((y) => (
+						<Fragment>
+							<path d={curve(y)} />
+							<path d={head(y)} />
+						</Fragment>
+					))
+				}
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M196 330 C 230 334, 262 330, 290 322"></path>
+				<path d="M290 322 l-10.4 -3.1 M290 322 l-7.5 7.9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x="14" y="312">the catalog is</text>
+				<text x="14" y="338">just more tables</text>
+			</g>
+		</svg>
+	</div>
+</figure>

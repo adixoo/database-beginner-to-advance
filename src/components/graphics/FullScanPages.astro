@@ -1,0 +1,169 @@
+---
+// A full table scan across pages: with no index on body, the database reads every page of
+// notes and checks every row against the WHERE. Matches are peach with a tick, the rest muted
+// with a cross, so the meaning never rests on colour alone. The butter arrow sweeps across all
+// of them. Below ~540px it scrolls sideways.
+
+interface ScanRow {
+	body: string;
+	matches?: boolean;
+}
+
+const TARGET = 'Book the trek';
+const PAGES: ScanRow[][] = [
+	[{ body: 'Buy milk' }, { body: 'Call Ravi' }, { body: TARGET, matches: true }],
+	[{ body: 'Pay rent' }, { body: 'Water plants' }, { body: 'Call mom' }],
+	[{ body: 'Fix bike' }, { body: TARGET, matches: true }, { body: 'Read a book' }],
+];
+
+const QUERY = { x: 10, y: 10, width: 440, height: 40 };
+const PAGE_Y = 90;
+const PAGE_WIDTH = 200;
+const PAGE_HEIGHT = 170;
+const PAGE_STEP = 210;
+const HEADER = { y: PAGE_Y + 12, height: 24 };
+const ROW_TOP = PAGE_Y + 46;
+const ROW_HEIGHT = 32;
+const ROW_STEP = 38;
+const pageX = (n: number): number => 10 + n * PAGE_STEP;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Full table scan diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 312"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="fsp-title fsp-desc"
+		>
+			<title id="fsp-title">With no index, the database checks every row on every page</title>
+			<desc id="fsp-desc">
+				The query asks for notes whose body is Book the trek, and body has no index. The database
+				reads page 0, page 1 and page 2 in turn and checks every row. Page 0 has a match in its
+				third row, page 1 has none, and page 2 has another match in its second row. It cannot stop
+				at the first match, because a later row may match too.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- The query -->
+				<rect
+					x={QUERY.x}
+					y={QUERY.y}
+					width={QUERY.width}
+					height={QUERY.height}
+					rx="10"
+					fill="var(--color-raised)"></rect>
+				<text
+					x={QUERY.x + 16}
+					y={QUERY.y + 26}
+					font-family="var(--font-mono)"
+					font-size="14"
+					fill="var(--color-ink)"
+					><tspan fill="var(--color-lilac)">SELECT</tspan> * <tspan fill="var(--color-lilac)"
+						>FROM</tspan
+					> notes <tspan fill="var(--color-lilac)">WHERE</tspan> body = 'Book the trek'</text
+				>
+
+				<!-- Every page, every row -->
+				{
+					PAGES.map((rows, n) => {
+						const x = pageX(n);
+						return (
+							<g>
+								<text
+									x={x + 4}
+									y={PAGE_Y - 12}
+									font-size="17"
+									font-weight="700"
+									fill="var(--color-ink)"
+								>
+									page {n}
+								</text>
+								<rect
+									x={x}
+									y={PAGE_Y}
+									width={PAGE_WIDTH}
+									height={PAGE_HEIGHT}
+									rx="14"
+									fill="var(--color-surface)"
+								/>
+								<rect
+									x={x + 12}
+									y={HEADER.y}
+									width={PAGE_WIDTH - 24}
+									height={HEADER.height}
+									rx="6"
+									fill="var(--color-raised)"
+								/>
+								<text x={x + 22} y={HEADER.y + 16} font-size="12" fill="var(--color-ink-muted)">
+									page header
+								</text>
+								{rows.map((row, index) => {
+									const y = ROW_TOP + index * ROW_STEP;
+									return (
+										<g>
+											<rect
+												x={x + 12}
+												y={y}
+												width={PAGE_WIDTH - 24}
+												height={ROW_HEIGHT}
+												rx="8"
+												fill={row.matches ? 'var(--color-peach)' : 'var(--color-raised)'}
+												fill-opacity={row.matches ? 0.1 : 1}
+												stroke={row.matches ? 'var(--color-peach)' : 'none'}
+												stroke-width="2"
+											/>
+											<text
+												x={x + 24}
+												y={y + 21}
+												font-family="var(--font-mono)"
+												font-size="13"
+												font-weight={row.matches ? 600 : 400}
+												fill={row.matches ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+											>
+												{row.body}
+											</text>
+											<text
+												x={x + PAGE_WIDTH - 24}
+												y={y + 21}
+												text-anchor="end"
+												font-size="15"
+												font-weight="700"
+												fill={row.matches ? 'var(--color-mint)' : 'var(--color-ink-muted)'}
+											>
+												{row.matches ? '✓' : '✗'}
+											</text>
+										</g>
+									);
+								})}
+							</g>
+						);
+					})
+				}
+			</g>
+
+			<!-- Annotation: the scan sweeps across every page -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M20 274 C 220 280, 420 268, 620 274"></path>
+				<path d="M620 274 l-9 -6.3 M620 274 l-9 6.3"></path>
+			</g>
+			<text
+				x="320"
+				y="302"
+				text-anchor="middle"
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true">reads every page, checks every row</text
+			>
+		</svg>
+	</div>
+</figure>

@@ -1,5 +1,5 @@
 ---
-// Why pages are one fixed size. Top: equal 4 KB pages, so page 3 starts at 3 × 4096 and the
+// Why pages are one fixed size. Top: equal 8 KB pages, so page 3 starts at 3 × 8192 and the
 // database jumps straight there (mint). Bottom: pages of different sizes, so finding page 3
 // means hopping through pages 0, 1 and 2 first to learn their sizes (rose). The target page is
 // peach in both. Below ~540px it scrolls sideways.
@@ -10,7 +10,7 @@ interface Page {
 	width: number;
 }
 
-const PAGE_SIZE = 4096;
+const PAGE_SIZE = 8192;
 const TARGET = 3;
 const PAGE_HEIGHT = 48;
 const FIXED_Y = 60;
@@ -51,7 +51,7 @@ const hops = VARIABLE.slice(0, TARGET).map((page, index) => {
 		>
 			<title id="fsj-title">With one fixed page size, any page is one jump away</title>
 			<desc id="fsj-desc">
-				Top: every page is 4 KB, so page 3 starts at byte 3 × 4096 = 12288 and the database jumps
+				Top: every page is 8 KB, so page 3 starts at byte 3 × 8192 = 24576 and the database jumps
 				straight there. Bottom: if pages had different sizes, the database would have to read page
 				0, then page 1, then page 2 to learn their sizes before it could find where page 3 starts.
 			</desc>

@@ -1,160 +1,103 @@
 ---
 title: How rows are stored
-description: A database file is split into fixed-size pages, and each page holds a header, a slot array and the rows themselves.
+description: How a table's rows are saved to a file on disk, step by step, in PostgreSQL, MySQL and SQLite.
 level: advanced
 order: 1
 ---
 
-import Callout from '@/components/Callout.astro';
-import DiskBlockRead from '@/components/graphics/DiskBlockRead.astro';
-import FixedSizeJump from '@/components/graphics/FixedSizeJump.astro';
-import OverflowPages from '@/components/graphics/OverflowPages.astro';
-import RecordIdLookup from '@/components/graphics/RecordIdLookup.astro';
-import SlottedPage from '@/components/graphics/SlottedPage.astro';
+import PageWithRows from '@/components/graphics/PageWithRows.astro';
+import RowHeader from '@/components/graphics/RowHeader.astro';
+import RowToBytes from '@/components/graphics/RowToBytes.astro';
+import StepFlow from '@/components/graphics/StepFlow.astro';
 import TableAsPages from '@/components/graphics/TableAsPages.astro';
+import TableBreakdown from '@/components/graphics/TableBreakdown.astro';
 import WordsToKnow from '@/components/WordsToKnow.astro';
 
-A table looks like a grid, but on disk it is a long run of bytes. The database cuts that run into equal blocks called **pages**, and every read and write works on whole pages.
-
-<TableAsPages />
-
-## Why pages
-
-Disks and the operating system move data in blocks, never single bytes. Ask for one 40-byte row and the whole block around it is read anyway:
-
-<DiskBlockRead />
-
-So a database packs each block with rows and calls it a **page**: one read brings back many rows at once.
-
-## Why one fixed size
-
-A database picks one page size and uses it everywhere:
-
-| Engine         | Default page size | Can you change it?                              |
-| -------------- | ----------------: | ----------------------------------------------- |
-| SQLite         |              4 KB | Yes, 512 bytes to 64 KB, before the first table |
-| PostgreSQL     |              8 KB | Only by recompiling                             |
-| MySQL (InnoDB) |             16 KB | Yes, when the server is first set up            |
-
-Page `n` starts at byte `n × page size` in the file, so the database can jump to any page without reading the ones before it. With pages of different sizes, it would have to walk through every page before the one it wants:
-
-<FixedSizeJump />
-
-Equal sizes help in two more ways. A freed page can be reused for any other page, since they all fit the same gap. And the [buffer pool](/advanced/buffer-pool) can keep pages in memory slots of one size.
-
-Make a table and ask SQLite about its pages:
+A table is saved to disk in four steps. PostgreSQL, MySQL and SQLite all work this way. We will follow this table:
 
 ```sql
 CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT);
 
-INSERT INTO notes (body) VALUES ('Buy milk'), ('Call Ravi'), ('Book the trek');
-
-PRAGMA page_size;
-PRAGMA page_count;
+INSERT INTO notes (id, body) VALUES (1, 'Buy milk'), (2, 'Call Ravi'), (3, 'Book the trek');
 ```
 
-`page_size` is the size of one page in bytes. `page_count` is how many pages the whole file has: here a couple, because a few short notes fit easily in one page.
+## Storing a row
 
-## Inside a page: the slotted page
+<StepFlow
+  id="write-path"
+  label="Steps to store a row"
+  title="Storing a table: split it, make bytes, fill pages, save the file"
+  desc="Step 1: the table is split into its schema, saved once, and one tuple per row. Step 2: each tuple becomes bytes, a header then each value. Step 3: rows are packed into fixed-size pages. Step 4: the pages are saved one after another as a file."
+  steps={[
+    { label: 'split the table', caption: ['schema once,', 'one tuple per row'] },
+    { label: 'make bytes', caption: ['a header, then', 'each value'] },
+    { label: 'fill a page', caption: ['many rows in one', 'fixed-size page'] },
+    { label: 'save the file', caption: ['pages, one', 'after another'] },
+  ]}
+/>
 
-Rows are not all the same length: `'Buy milk'` is shorter than a whole paragraph. To pack rows of any length, most engines use a **slotted page**:
+### 1. Split the table
 
-<SlottedPage />
+<TableBreakdown />
 
-- The **page header** sits at the start. In PostgreSQL it is 24 bytes; in SQLite 8 bytes for a leaf page.
-- The **slot array** comes next. Each slot holds the offset and length of one row. In PostgreSQL a slot is 4 bytes.
-- **Rows** are written from the end of the page backwards.
-- **Free space** is the gap in the middle. The page is full when the two ends meet.
+The column names and types, the **schema**, are saved once ([How the schema is stored](/advanced/how-the-schema-is-stored)). Each row is saved as a **tuple**: just its values, in column order.
 
-Because rows are found through their slot, a row can move inside the page (to close a gap, say) and only its slot changes.
+### 2. Turn each tuple into bytes
 
-## Record ids
+<RowToBytes />
 
-To point at one row, the database needs its page and its slot. Together they are the **record id**:
+A small **header** comes first, then the values, one after another.
 
-<RecordIdLookup />
+#### What the header holds
 
-Each engine spells it differently:
+The header is a few bytes at the start of every row that describe the values after it:
 
-| Engine         | Record id                     | Example |
-| -------------- | ----------------------------- | ------- |
-| PostgreSQL     | `ctid` = (page number, slot)  | `(0,3)` |
-| SQLite         | `rowid`, a 64-bit integer key | `3`     |
-| MySQL (InnoDB) | The primary key value         | `3`     |
+<RowHeader />
 
-In SQLite, a column declared `INTEGER PRIMARY KEY` is the `rowid` under another name:
+- **Sizes:** values can be different lengths, so the row notes how many bytes each one takes. Without that, the database could not tell where `'Buy milk'` ends.
+- **NULLs:** a `NULL` takes no space among the values. The header just marks it as missing.
 
-```sql
-SELECT rowid, id, body FROM notes;
-```
+Each engine's header is a little different:
 
-SQLite and InnoDB do not store rows in a loose pile: the table itself is a B-tree sorted by that key, so the key leads to the right page. [B+ tree internals](/advanced/b-tree-internals) shows how.
+| Engine         | What the row starts with                                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL     | About 24 bytes: a NULL flag for each column, and which transaction wrote the row. Each text value carries its own length just before it. |
+| MySQL (InnoDB) | The lengths of the variable-size values, a NULL flag for each column, and hidden columns saying which transaction wrote the row          |
+| SQLite         | One small code per column, giving its type and size                                                                                      |
 
-## How many rows fit
+### 3. Pack rows into a page
 
-Take an 8 KB PostgreSQL page and rows with 100 bytes of data. Each row also pays a 24-byte row header and a 4-byte slot:
+The row's bytes go into a **page**: a fixed-size box that holds many rows. Each row gets a numbered **slot**, so it can be found again later.
 
-```text
-usable space   8192 − 24 (page header)   = 8168 bytes
-cost per row   100 + 24 + 4              =  128 bytes
-rows per page  8168 ÷ 128                ≈   63 rows
-```
+<PageWithRows />
 
-So a table of 1 million such rows needs about 16,000 pages, roughly 125 MB. Wider rows mean fewer per page, and more pages to read for the same query.
+When the free space runs out, the page is full, and the next row goes into a new page. Every page in a database is the same size:
 
-## Deleting and updating
+| Engine         | Page size |
+| -------------- | --------: |
+| PostgreSQL     |      8 KB |
+| MySQL (InnoDB) |     16 KB |
+| SQLite         |      4 KB |
 
-- **Delete:** the slot is marked unused. The bytes stay until the page is tidied: SQLite keeps a list of freed blocks inside the page, and PostgreSQL's `VACUUM` cleans pages later.
-- **Update to a shorter value:** usually fits in place.
-- **Update to a longer value:** if the page has room, the row moves within the page. If not, it moves to another page. PostgreSQL always writes a new copy of the row on update; [MVCC](/advanced/mvcc) explains why.
+### 4. Save the pages as a file
 
-## Values too big for a page
+<TableAsPages />
 
-A row bigger than a page cannot sit in a slot. Each engine moves the big part out:
+The table's file is just its pages, one after another.
 
-- **SQLite** keeps the start of the row in the page and puts the rest in a chain of **overflow pages**, each pointing at the next.
-- **PostgreSQL** uses **TOAST**: once a row passes about 2 KB, it first tries to compress large values, then moves them into a separate TOAST table in about 2 KB chunks. The row keeps a small pointer.
-- **InnoDB** stores long `TEXT` and `BLOB` values on separate overflow pages and keeps a 20-byte pointer in the row.
-
-Here is SQLite's chain for one long note:
-
-<OverflowPages />
-
-Try a 10,000-character note:
-
-```sql
-INSERT INTO notes (body) VALUES (hex(zeroblob(5000)));
-
-SELECT id, length(body) FROM notes;
-
-PRAGMA page_count;
-```
-
-`hex(zeroblob(5000))` makes a string of 10,000 zeros. It cannot fit in one 4 KB page, so the page count jumps: the extra pages are overflow pages.
-
-<Callout type="info">
-
-`SELECT *` reads every column, including big ones parked on overflow or TOAST pages. Naming only the columns you need can skip all those extra page reads.
-
-</Callout>
+Next: how each value becomes bytes, in [How values are encoded](/advanced/how-values-are-encoded); where the schema goes, in [How the schema is stored](/advanced/how-the-schema-is-stored); and how a row is found again, in [How rows are read](/advanced/how-rows-are-read).
 
 ## Words to know
 
 <WordsToKnow>
 
-- **Overflow page**
-  A page that holds the part of a row too big to fit in its own page.
 - **Page**
-  A fixed-size block of the database file, such as 4 KB or 8 KB; the unit of every read and write.
-- **Page header**
-  The bytes at the start of a page that describe it: its type, its slot count and where free space is.
-- **Record id**
-  The address of a row: its page and slot, or a key that leads to them.
-- **Slot array**
-  A list near the start of a page with the position and length of each row.
-- **Slotted page**
-  A page layout where slots grow from the front and rows grow from the back.
-- **TOAST**
-  PostgreSQL's way of compressing large values and storing them in a separate table.
+  A fixed-size block of a database file, such as 4, 8 or 16 KB, holding many rows.
+- **Schema**
+  A table's column names and types, saved once.
+- **Slot**
+  An entry in a page that says where one row sits inside it.
+- **Tuple**
+  One row's values in column order, without the column names.
 
 </WordsToKnow>

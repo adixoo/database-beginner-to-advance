@@ -1,0 +1,125 @@
+---
+// A numbered row of steps joined by arrows, each with a short caption underneath. Used for
+// "what happens, in order" overviews, such as the path of a row from INSERT to disk. Steps share
+// the width equally; keep labels to about 14 characters and caption lines to about 16. Below
+// ~520px it scrolls sideways.
+
+export interface FlowStep {
+	label: string;
+	// One string per caption line
+	caption: string[];
+}
+
+interface Props {
+	// Unique per page, for the title and desc ids
+	id: string;
+	label: string;
+	title: string;
+	desc: string;
+	steps: FlowStep[];
+}
+
+const VIEW_WIDTH = 640;
+const MARGIN = 10;
+const GAP = 22;
+const CHIP_Y = 32;
+const CHIP_HEIGHT = 48;
+const CAPTION_TOP = CHIP_Y + CHIP_HEIGHT + 26;
+const CAPTION_LINE = 18;
+
+const { id, label, title, desc, steps } = Astro.props;
+const chipWidth = (VIEW_WIDTH - 2 * MARGIN - GAP * (steps.length - 1)) / steps.length;
+const chipX = (index: number): number => MARGIN + index * (chipWidth + GAP);
+const maxLines = Math.max(...steps.map((step) => step.caption.length));
+const height = CAPTION_TOP + (maxLines - 1) * CAPTION_LINE + 14;
+const arrowY = CHIP_Y + CHIP_HEIGHT / 2;
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label={label} tabindex="0">
+		<svg
+			viewBox={`0 0 ${VIEW_WIDTH} ${height}`}
+			class="w-full min-w-[520px]"
+			role="img"
+			aria-labelledby={`${id}-title ${id}-desc`}
+		>
+			<title id={`${id}-title`}>{title}</title>
+			<desc id={`${id}-desc`}>{desc}</desc>
+
+			<g font-family="var(--font-sans)" aria-hidden="true">
+				{
+					steps.map((step, index) => {
+						const x = chipX(index);
+						const centre = x + chipWidth / 2;
+						return (
+							<g>
+								<text
+									x={centre}
+									y={CHIP_Y - 10}
+									text-anchor="middle"
+									font-family="var(--font-mono)"
+									font-size="13"
+									fill="var(--color-ink-muted)"
+								>
+									{index + 1}
+								</text>
+								<rect
+									x={x}
+									y={CHIP_Y}
+									width={chipWidth}
+									height={CHIP_HEIGHT}
+									rx="10"
+									fill="var(--color-raised)"
+								/>
+								<text
+									x={centre}
+									y={CHIP_Y + 30}
+									text-anchor="middle"
+									font-size="15"
+									font-weight="600"
+									fill="var(--color-ink)"
+								>
+									{step.label}
+								</text>
+								{step.caption.map((line, lineIndex) => (
+									<text
+										x={centre}
+										y={CAPTION_TOP + lineIndex * CAPTION_LINE}
+										text-anchor="middle"
+										font-size="13"
+										fill="var(--color-ink-muted)"
+									>
+										{line}
+									</text>
+								))}
+							</g>
+						);
+					})
+				}
+			</g>
+
+			<!-- Arrows between steps -->
+			<g
+				fill="none"
+				stroke="var(--color-ink-muted)"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				{
+					steps.slice(1).map((_, index) => {
+						const from = chipX(index) + chipWidth + 4;
+						const to = chipX(index + 1) - 4;
+						return (
+							<Fragment>
+								<path d={`M${from} ${arrowY} L ${to} ${arrowY}`} />
+								<path d={`M${to} ${arrowY} l-7 -4.9 M${to} ${arrowY} l-7 4.9`} />
+							</Fragment>
+						);
+					})
+				}
+			</g>
+		</svg>
+	</div>
+</figure>

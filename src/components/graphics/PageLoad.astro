@@ -1,0 +1,175 @@
+---
+// Loading a page: the table's file on disk (left) and the buffer pool in memory (right). Page 0
+// (peach) is read from disk in one go into a free frame (mint arrow). Page 2 is already in
+// memory, so reading it needs no disk at all. Below ~540px it scrolls sideways.
+
+interface Frame {
+	x: number;
+	y: number;
+	page?: string;
+	isNew?: boolean;
+}
+
+const BOX_Y = 44;
+const BOX_HEIGHT = 196;
+const DISK = { x: 10, width: 210 };
+const MEMORY = { x: 380, width: 250 };
+const DISK_PAGES = [0, 1, 2, 3];
+const LOADED_PAGE = 0;
+const PAGE_HEIGHT = 36;
+const pageY = (n: number): number => BOX_Y + 16 + n * (PAGE_HEIGHT + 8);
+
+const FRAME_WIDTH = 103;
+const FRAME_HEIGHT = 76;
+const FRAMES: Frame[] = [
+	{ x: 396, y: 60, page: 'page 0', isNew: true },
+	{ x: 511, y: 60, page: 'page 2' },
+	{ x: 396, y: 148 },
+	{ x: 511, y: 148 },
+];
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Page load diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 276"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="pl-title pl-desc"
+		>
+			<title id="pl-title">A page is copied from disk into memory before it is read</title>
+			<desc id="pl-desc">
+				On disk, the table's file holds pages 0 to 3. Memory, called the buffer pool, has room for
+				four pages. Page 0 is read from disk in one go into a free spot in memory. Page 2 is already
+				in memory, so reading it needs no disk read at all.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- Disk -->
+				<text x={DISK.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>on disk</text
+				>
+				<rect
+					x={DISK.x}
+					y={BOX_Y}
+					width={DISK.width}
+					height={BOX_HEIGHT}
+					rx="14"
+					fill="var(--color-surface)"></rect>
+				{
+					DISK_PAGES.map((n) => {
+						const isLoaded = n === LOADED_PAGE;
+						return (
+							<g>
+								<rect
+									x={DISK.x + 16}
+									y={pageY(n)}
+									width={DISK.width - 32}
+									height={PAGE_HEIGHT}
+									rx="8"
+									fill={isLoaded ? 'var(--color-peach)' : 'var(--color-raised)'}
+									fill-opacity={isLoaded ? 0.1 : 1}
+									stroke={isLoaded ? 'var(--color-peach)' : 'none'}
+									stroke-width="2"
+								/>
+								<text
+									x={DISK.x + 32}
+									y={pageY(n) + 23}
+									font-size="15"
+									font-weight={isLoaded ? 600 : 400}
+									fill={isLoaded ? 'var(--color-ink)' : 'var(--color-ink-soft)'}
+								>
+									page {n}
+								</text>
+							</g>
+						);
+					})
+				}
+
+				<!-- Memory -->
+				<text x={MEMORY.x + 4} y="30" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>in memory (buffer pool)</text
+				>
+				<rect
+					x={MEMORY.x}
+					y={BOX_Y}
+					width={MEMORY.width}
+					height={BOX_HEIGHT}
+					rx="14"
+					fill="var(--color-surface)"></rect>
+				{
+					FRAMES.map((frame) => (
+						<g>
+							<rect
+								x={frame.x}
+								y={frame.y}
+								width={FRAME_WIDTH}
+								height={FRAME_HEIGHT}
+								rx="10"
+								fill={
+									frame.isNew ? 'var(--color-peach)' : frame.page ? 'var(--color-raised)' : 'none'
+								}
+								fill-opacity={frame.isNew ? 0.1 : 1}
+								stroke={
+									frame.isNew ? 'var(--color-peach)' : frame.page ? 'none' : 'var(--color-gray-600)'
+								}
+								stroke-width="2"
+								stroke-dasharray={frame.page ? undefined : '6 6'}
+							/>
+							<text
+								x={frame.x + FRAME_WIDTH / 2}
+								y={frame.y + FRAME_HEIGHT / 2 + 5}
+								text-anchor="middle"
+								font-size="15"
+								font-weight={frame.isNew ? 600 : 400}
+								fill={frame.page ? 'var(--color-ink)' : 'var(--color-ink-muted)'}
+							>
+								{frame.page ?? 'free'}
+							</text>
+						</g>
+					))
+				}
+				<text x={MEMORY.x + 4} y="266" font-size="13" fill="var(--color-ink-muted)"
+					>page 2 is already here: no disk read</text
+				>
+			</g>
+
+			<!-- One read copies page 0 into memory -->
+			<g
+				fill="none"
+				stroke="var(--color-mint)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M208 78 C 280 70, 330 96, 390 98"></path>
+				<path d="M390 98 l-9 -6.3 M390 98 l-9 6.3"></path>
+			</g>
+
+			<!-- Annotation -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M300 136 C 302 126, 298 116, 300 106"></path>
+				<path d="M300 106 l-6.3 9 M300 106 l6.3 9"></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="22"
+				font-weight="600"
+				fill="var(--color-butter)"
+				text-anchor="middle"
+				aria-hidden="true"
+			>
+				<text x="300" y="160">one read copies</text>
+				<text x="300" y="184">the whole page</text>
+			</g>
+		</svg>
+	</div>
+</figure>
