@@ -1,5 +1,11 @@
 # database-new
 
+## 0.3.1
+
+### Patch Changes
+
+- Serve one sitemap at /sitemap.xml instead of a sitemap index pointing at numbered sitemap files; robots.txt now points at it.
+
 ## 0.3.0
 
 ### Minor Changes
