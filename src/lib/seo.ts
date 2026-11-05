@@ -10,6 +10,28 @@ export function canonicalUrl(pathname: string, site: URL): string {
 	return new URL(`/${pageSlug(pathname)}`, site).href;
 }
 
+const XML_ESCAPES: Record<string, string> = {
+	'&': '&amp;',
+	'<': '&lt;',
+	'>': '&gt;',
+	'"': '&quot;',
+	"'": '&apos;',
+};
+
+// A single sitemap file listing every URL (no sitemap index), as served at /sitemap.xml
+export function sitemapXml(urls: readonly string[]): string {
+	const entries = urls.map(
+		(url) => `  <url><loc>${url.replace(/[&<>"']/g, (char) => XML_ESCAPES[char])}</loc></url>`,
+	);
+	return [
+		'<?xml version="1.0" encoding="UTF-8"?>',
+		'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+		...entries,
+		'</urlset>',
+		'',
+	].join('\n');
+}
+
 // Open Graph's recommended size for a large preview card
 export const OG_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 
