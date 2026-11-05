@@ -1,0 +1,254 @@
+---
+// Two's complement in one byte. Top: 1 is 00000001; flip every bit (sky) to get 11111110; add
+// 1 to get 11111111, which is −1 (peach). Bottom: why it is done this way. Adding 1 to −1 the
+// ordinary way gives 00000000 plus a carried 1 that does not fit in the byte and is dropped,
+// so the answer is 0. Below ~540px it scrolls sideways.
+
+interface BitRow {
+	label: string;
+	bits: string;
+	result?: string;
+	tone?: string;
+}
+
+const LABEL_X = 14;
+const BITS_X = 170;
+const CELL = 32;
+const STEP = 36;
+const ROW_HEIGHT = 40;
+const RESULT_X = BITS_X + 7 * STEP + CELL + 20;
+const bitX = (index: number): number => BITS_X + index * STEP;
+
+const MAKE_TOP = 40;
+const MAKE_GAP = 56;
+const MAKE: BitRow[] = [
+	{ label: 'start with 1', bits: '00000001', result: '= 1' },
+	{ label: 'flip every bit', bits: '11111110', tone: 'var(--color-sky)' },
+	{ label: 'add 1', bits: '11111111', result: '= −1', tone: 'var(--color-peach)' },
+];
+
+const CHECK_TITLE_Y = 238;
+const CHECK: BitRow[] = [
+	{ label: '−1', bits: '11111111', tone: 'var(--color-peach)' },
+	{ label: '+ 1', bits: '00000001' },
+];
+const CHECK_TOP = 254;
+const CHECK_GAP = 50;
+const SUM_LINE_Y = CHECK_TOP + 2 * CHECK_GAP - 6;
+const SUM_Y = SUM_LINE_Y + 10;
+const CARRY_X = bitX(-1);
+---
+
+<figure class="not-prose my-10">
+	<div class="overflow-x-auto" role="region" aria-label="Two's complement diagram" tabindex="0">
+		<svg
+			viewBox="0 0 640 448"
+			class="w-full min-w-[540px]"
+			role="img"
+			aria-labelledby="tc-title tc-desc"
+		>
+			<title id="tc-title">How −1 is stored in one byte, and why</title>
+			<desc id="tc-desc">
+				To store −1 in one byte: start with 1, which is 00000001. Flip every bit to get 11111110.
+				Add 1 to get 11111111, which means −1. Why this works: adding 1 to 11111111 the ordinary way
+				gives 00000000 with a 1 carried out of the byte. That carried 1 does not fit and is dropped,
+				so the answer is 0, as it should be. The same adding circuit works for negative and positive
+				numbers.
+			</desc>
+
+			<g font-family="var(--font-sans)">
+				<!-- Making −1 -->
+				<text x={LABEL_X} y="24" font-size="17" font-weight="700" fill="var(--color-ink)"
+					>−1 in one byte</text
+				>
+				{
+					MAKE.map((row, rowIndex) => {
+						const y = MAKE_TOP + rowIndex * MAKE_GAP;
+						return (
+							<g>
+								<text x={LABEL_X} y={y + 26} font-size="15" fill="var(--color-ink-soft)">
+									{row.label}
+								</text>
+								{[...row.bits].map((bit, index) => (
+									<g>
+										<rect
+											x={bitX(index)}
+											y={y}
+											width={CELL}
+											height={ROW_HEIGHT}
+											rx="6"
+											fill={row.tone ?? 'var(--color-raised)'}
+											fill-opacity={row.tone ? 0.14 : 1}
+											stroke={row.tone ?? 'none'}
+											stroke-width="2"
+										/>
+										<text
+											x={bitX(index) + CELL / 2}
+											y={y + 26}
+											text-anchor="middle"
+											font-family="var(--font-mono)"
+											font-size="16"
+											fill="var(--color-ink)"
+										>
+											{bit}
+										</text>
+									</g>
+								))}
+								{row.result && (
+									<text
+										x={RESULT_X}
+										y={y + 26}
+										font-family="var(--font-mono)"
+										font-size="17"
+										font-weight="700"
+										fill={row.tone ?? 'var(--color-ink)'}
+									>
+										{row.result}
+									</text>
+								)}
+							</g>
+						);
+					})
+				}
+
+				<!-- Why: −1 + 1 = 0 with ordinary addition -->
+				<text x={LABEL_X} y={CHECK_TITLE_Y} font-size="17" font-weight="700" fill="var(--color-ink)"
+					>why: −1 + 1 = 0</text
+				>
+				{
+					CHECK.map((row, rowIndex) => {
+						const y = CHECK_TOP + rowIndex * CHECK_GAP;
+						return (
+							<g>
+								<text
+									x={LABEL_X}
+									y={y + 26}
+									font-family="var(--font-mono)"
+									font-size="16"
+									fill="var(--color-ink-soft)"
+								>
+									{row.label}
+								</text>
+								{[...row.bits].map((bit, index) => (
+									<g>
+										<rect
+											x={bitX(index)}
+											y={y}
+											width={CELL}
+											height={ROW_HEIGHT}
+											rx="6"
+											fill={row.tone ?? 'var(--color-raised)'}
+											fill-opacity={row.tone ? 0.14 : 1}
+											stroke={row.tone ?? 'none'}
+											stroke-width="2"
+										/>
+										<text
+											x={bitX(index) + CELL / 2}
+											y={y + 26}
+											text-anchor="middle"
+											font-family="var(--font-mono)"
+											font-size="16"
+											fill="var(--color-ink)"
+										>
+											{bit}
+										</text>
+									</g>
+								))}
+							</g>
+						);
+					})
+				}
+				<line
+					x1={CARRY_X}
+					y1={SUM_LINE_Y}
+					x2={bitX(7) + CELL}
+					y2={SUM_LINE_Y}
+					stroke="var(--color-gray-600)"
+					stroke-width="2"></line>
+
+				<!-- The sum: a carried 1 that does not fit, then eight zeros -->
+				<rect
+					x={CARRY_X}
+					y={SUM_Y}
+					width={CELL}
+					height={ROW_HEIGHT}
+					rx="6"
+					fill="none"
+					stroke="var(--color-gray-600)"
+					stroke-width="2"
+					stroke-dasharray="4 4"></rect>
+				<text
+					x={CARRY_X + CELL / 2}
+					y={SUM_Y + 26}
+					text-anchor="middle"
+					font-family="var(--font-mono)"
+					font-size="16"
+					fill="var(--color-ink-muted)"
+					text-decoration="line-through">1</text
+				>
+				{
+					[...'00000000'].map((bit, index) => (
+						<g>
+							<rect
+								x={bitX(index)}
+								y={SUM_Y}
+								width={CELL}
+								height={ROW_HEIGHT}
+								rx="6"
+								fill="var(--color-mint)"
+								fill-opacity="0.16"
+								stroke="var(--color-mint)"
+								stroke-width="2"
+							/>
+							<text
+								x={bitX(index) + CELL / 2}
+								y={SUM_Y + 26}
+								text-anchor="middle"
+								font-family="var(--font-mono)"
+								font-size="16"
+								fill="var(--color-ink)"
+							>
+								{bit}
+							</text>
+						</g>
+					))
+				}
+				<text
+					x={RESULT_X}
+					y={SUM_Y + 26}
+					font-family="var(--font-mono)"
+					font-size="17"
+					font-weight="700"
+					fill="var(--color-mint)">= 0 ✓</text
+				>
+			</g>
+
+			<!-- Annotation: the carried 1 is dropped -->
+			<g
+				fill="none"
+				stroke="var(--color-butter)"
+				stroke-width="3"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path
+					d={`M${CARRY_X - 30} ${SUM_Y + 30} C ${CARRY_X - 22} ${SUM_Y + 26}, ${CARRY_X - 12} ${SUM_Y + 22}, ${CARRY_X - 4} ${SUM_Y + 20}`}
+				></path>
+				<path
+					d={`M${CARRY_X - 4} ${SUM_Y + 20} l-10.6 -2.2 M${CARRY_X - 4} ${SUM_Y + 20} l-6.8 8.6`}
+				></path>
+			</g>
+			<g
+				font-family="var(--font-hand)"
+				font-size="20"
+				font-weight="600"
+				fill="var(--color-butter)"
+				aria-hidden="true"
+			>
+				<text x={LABEL_X} y={SUM_Y + 30}>no room:</text>
+				<text x={LABEL_X} y={SUM_Y + 54}>dropped</text>
+			</g>
+		</svg>
+	</div>
+</figure>

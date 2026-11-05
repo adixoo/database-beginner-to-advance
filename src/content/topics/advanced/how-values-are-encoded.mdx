@@ -2,10 +2,11 @@
 title: How values are encoded
 description: How a database turns numbers, text and NULL into bytes, and why the encoding decides how much space each row takes.
 level: advanced
-order: 4
+order: 2
 ---
 
 import Callout from '@/components/Callout.astro';
+import TwosComplement from '@/components/graphics/TwosComplement.astro';
 import WordsToKnow from '@/components/WordsToKnow.astro';
 
 A page is just bytes ([How rows are stored](/advanced/how-rows-are-stored)). Before a row can go in one, every value in it must become bytes too. How that is done decides how big rows are, how fast they compare and what a column can hold.
@@ -27,7 +28,11 @@ An integer is stored in binary in a fixed number of bytes. More bytes, bigger ra
 
 An `INTEGER` id overflows at 2,147,483,647 rows ever inserted, which busy apps do hit. Use `BIGINT` for ids that can grow without limit.
 
-Negative numbers use **two's complement**: flip every bit of the positive number and add 1. In one byte, `1` is `00000001` and `−1` is `11111111`. The same addition circuit then works for both signs. SQLite shows it if you print `−1` in hex:
+Negative numbers use **two's complement**: flip every bit of the positive number, then add 1.
+
+<TwosComplement />
+
+Plain addition then works for both signs, so the CPU needs no extra circuit for negatives. SQLite shows it if you print `−1` in hex:
 
 ```sql
 SELECT printf('%x', 255) AS two_five_five, printf('%x', -1) AS minus_one;

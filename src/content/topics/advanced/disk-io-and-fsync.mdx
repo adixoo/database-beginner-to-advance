@@ -2,13 +2,18 @@
 title: Disk I/O and fsync
 description: Why random reads are slow, why a finished write may not be on disk yet, and how fsync makes a commit survive a power cut.
 level: advanced
-order: 2
+order: 5
 ---
 
 import Callout from '@/components/Callout.astro';
 import WordsToKnow from '@/components/WordsToKnow.astro';
 
 A database is only as fast as the slowest thing it waits for, and that is almost always the disk. This topic is about what really happens between "save this page" and "it is safe on disk".
+
+## What the two words mean
+
+- **Disk I/O:** reading data from the disk, or writing data to it. It is slow.
+- **fsync:** tells the system "save this file to the disk now". Until then, a write may only be in memory.
 
 ## How slow is slow
 
@@ -137,6 +142,8 @@ The ratio of bytes written to bytes changed is the **write amplification**. It c
   Reads and writes that pass through the operating system's page cache.
 - **Direct I/O**
   Reads and writes that skip the OS page cache and go straight to the disk.
+- **Disk I/O**
+  Reading data from the disk into memory, or writing it from memory back to the disk.
 - **Durable**
   Saved so that it survives a crash or power cut.
 - **fsync**
