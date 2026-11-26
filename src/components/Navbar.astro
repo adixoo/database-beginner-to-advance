@@ -154,8 +154,26 @@ const buttonClass =
 									aria-current={link.current ? 'page' : undefined}
 									target={link.external ? '_blank' : undefined}
 									rel={link.external ? 'noopener noreferrer' : undefined}
-									class="inline-flex items-center gap-2 rounded-sm text-[clamp(32px,8vw,44px)] leading-[1.1] font-bold tracking-[-0.02em] text-ink decoration-mint decoration-[0.08em] underline-offset-[0.14em] transition-opacity duration-150 hover:opacity-50 aria-[current=page]:underline"
+									class="inline-flex items-center gap-2 rounded-sm text-[clamp(28px,8vw,44px)] leading-[1.1] font-bold tracking-[-0.02em] text-ink decoration-mint decoration-[0.08em] underline-offset-[0.14em] transition-opacity duration-150 hover:opacity-50 aria-[current=page]:underline"
 								>
+									{/* Every tool is a Sequill app: its logo, a pen nib in three bands */}
+									{link.external && (
+										<svg viewBox="72 64 368 392" aria-hidden="true" class="size-[0.9em] shrink-0">
+											<path
+												d="M150 64H362Q400 64 400 102V124Q256 172 112 124V102Q112 64 150 64Z"
+												fill="var(--color-peach)"
+											/>
+											<path
+												d="M112 150Q256 198 400 150V192Q256 240 112 192Z"
+												fill="var(--color-butter)"
+											/>
+											<path
+												d="M112 218Q256 266 400 218V256L256 456L112 256ZM256 286a26 26 0 1 0 0 52a26 26 0 1 0 0-52ZM248 338H264V412L256 426L248 412Z"
+												fill="var(--color-mint)"
+												fill-rule="evenodd"
+											/>
+										</svg>
+									)}
 									{link.label}
 									{link.external && (
 										<>

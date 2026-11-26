@@ -44,13 +44,13 @@ export interface PracticeTool {
 export const PRACTICE_TOOLS = [
 	{
 		name: 'Sequill editor',
-		navLabel: 'SQLite editor',
+		navLabel: 'Sequill editor',
 		href: 'https://sequill.adibitz.com/app',
 		description: 'Write and run SQL on a SQLite database in your browser.',
 	},
 	{
-		name: 'Sequill schema visualizer',
-		navLabel: 'Schema design',
+		name: 'Sequill schema designer',
+		navLabel: 'Sequill schema',
 		href: 'https://sequill.adibitz.com/vis',
 		description: 'See your tables and how they connect as a diagram.',
 	},
