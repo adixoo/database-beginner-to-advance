@@ -1,0 +1,93 @@
+---
+// The two learning paths side by side: an animated mockup of what the path teaches, what the
+// path is for, how many topics it has and its first few topics as links.
+import CanvasScene from './CanvasScene.astro';
+import DoodleButton from './DoodleButton.astro';
+import type { SceneName } from '../scripts/canvas/scenes';
+import { LEVELS, PATHS, type LearningPath, type Level } from '../config/site';
+import { getTopics, topicHref } from '../lib/topics';
+
+// How many topics to list under each path before "all topics"
+const PREVIEW_COUNT = 5;
+
+const MOCKUPS: Record<Level, { scene: SceneName; label: string }> = {
+	beginner: {
+		scene: 'database-doodle',
+		label:
+			'Hand-drawn sketch of a puzzled person at a laptop, with a speech bubble showing a database cylinder',
+	},
+	advanced: {
+		scene: 'tuning-doodle',
+		label:
+			'Hand-drawn sketch of a frowning developer with glasses at a laptop, surrounded by doodles of a database with a gear, a query plan, an index tree and a rising bar chart',
+	},
+};
+
+const paths = await Promise.all(
+	LEVELS.map(async (level) => {
+		const topics = await getTopics(level);
+		const path: LearningPath = PATHS[level];
+		return { level, path, mockup: MOCKUPS[level], topics };
+	}),
+);
+---
+
+<section class="px-page pt-28 pb-32 lg:pt-40 lg:pb-48" aria-labelledby="paths-title">
+	<h2
+		id="paths-title"
+		class="max-w-[16ch] text-[clamp(40px,6vw,88px)] leading-[0.95] font-bold tracking-[-0.03em]"
+		data-reveal
+	>
+		Two ways in
+	</h2>
+
+	<div class="mt-14 grid gap-20 lg:mt-20 lg:grid-cols-2 lg:gap-8">
+		{
+			paths.map(({ level, path, mockup, topics }, i) => (
+				<article aria-labelledby={`path-${level}`} class="flex flex-col">
+					<div data-reveal style={`--i: ${i}`}>
+						<CanvasScene scene={mockup.scene} label={mockup.label} class="w-full" />
+					</div>
+
+					<h3
+						id={`path-${level}`}
+						class="mt-8 text-[clamp(36px,4vw,56px)] leading-none font-bold tracking-tight"
+						data-reveal
+						style={`--i: ${i + 1}`}
+					>
+						{path.label}
+					</h3>
+					<div data-reveal style={`--i: ${i + 2}`}>
+						<p class="mt-4 max-w-[40ch] text-[clamp(18px,1.4vw,21px)] leading-snug text-ink-body">
+							{path.summary} {topics.length} topics.{' '}
+							{path.prerequisites && (
+								<span class="text-ink-soft">
+									You only need the basics of {path.prerequisites.join(' and ').toLowerCase()}.
+								</span>
+							)}
+						</p>
+
+						<ol class="mt-8 flex flex-col gap-1 text-lg">
+							{topics.slice(0, PREVIEW_COUNT).map((topic) => (
+								<li>
+									<a
+										href={topicHref(topic)}
+										class="flex min-h-12 items-center justify-between gap-6 rounded-[12px] bg-surface px-5 text-ink transition-colors duration-150 hover:bg-raised"
+									>
+										{topic.data.title}
+										<span aria-hidden="true" class="text-mint">
+											→
+										</span>
+									</a>
+								</li>
+							))}
+						</ol>
+						<DoodleButton href={path.href} variant={i === 0 ? 'primary' : 'secondary'} class="mt-9">
+							{`See all ${topics.length} ${path.label.toLowerCase()} topics`}
+						</DoodleButton>
+					</div>
+				</article>
+			))
+		}
+	</div>
+</section>

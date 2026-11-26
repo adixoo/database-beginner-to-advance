@@ -3,7 +3,7 @@
 @import 'shadcn/tailwind.css';
 @plugin '@tailwindcss/typography';
 
-/* shadcn/ui dark styles; <html> carries the .dark class because the site is dark only */
+/* shadcn/ui dark styles; <html> carries the .dark class in the dark theme (see Layout.astro) */
 @custom-variant dark (&:is(.dark *));
 
 /* Pastel Noir tokens (DESIGN.md). Only the roles this site uses.
@@ -33,6 +33,8 @@
 	--color-butter: #f5e1a4;
 	--color-rose: #f6a8c6;
 	--color-on-accent: #0a0a0b;
+	/* A soft mint field that stays pastel in both themes, under on-accent text (the footer) */
+	--color-field: #a6e3c4;
 
 	--spacing-page: clamp(20px, 2.2vw, 32px);
 
@@ -103,6 +105,35 @@
 	:where(h1, h2, h3, h4, h5, h6) {
 		color: var(--color-ink);
 	}
+}
+
+/* Light theme: the same roles on a soft cool-grey ground (no pure white, to cut glare). Pastels
+   turn into deep versions of themselves so text and strokes stay 4.7:1 or better on canvas,
+   surface, raised and their own 14% washes. Unlayered, so it beats the dark values above. */
+html:not(.dark) {
+	color-scheme: light;
+
+	--color-canvas: #f4f4f6;
+	--color-surface: #ebebee;
+	--color-raised: #e3e3e7;
+	--color-gray-800: #d9d9de;
+	--color-gray-700: #c8c8cf;
+	--color-gray-600: #a1a1aa;
+	--color-gray-500: #80808a;
+	--color-ink: #151518;
+	--color-ink-body: #2c2c32;
+	--color-ink-soft: #44444b;
+	--color-ink-muted: #58585f;
+	--color-mint: #186444;
+	--color-peach: #9a3c26;
+	--color-sky: #2a55a6;
+	--color-lilac: #6342b8;
+	--color-butter: #735400;
+	--color-rose: #9c2d55;
+
+	/* Deep accent fills take light text */
+	--primary-foreground: #fafafa;
+	--sidebar-primary-foreground: #fafafa;
 }
 
 /* Motion. Hidden states apply only when scripting works (`.js` on <html>) and motion is allowed. */
@@ -205,7 +236,7 @@
 		counter-reset: section;
 
 		& :where(h2) {
-			scroll-margin-top: 2rem;
+			scroll-margin-top: 6.5rem; /* clears the fixed navbar */
 			margin-top: 2.2em;
 			margin-bottom: 0.6em;
 			font-size: clamp(28px, 2.6vw, 36px);
@@ -217,7 +248,7 @@
 		}
 
 		& :where(h3) {
-			scroll-margin-top: 2rem;
+			scroll-margin-top: 6.5rem; /* clears the fixed navbar */
 			margin-top: 1.8em;
 			margin-bottom: 0.5em;
 			font-size: clamp(21px, 1.7vw, 24px);
@@ -333,7 +364,8 @@
 	--popover-foreground: var(--color-ink);
 	--primary: var(--color-mint);
 	--primary-foreground: var(--color-on-accent);
-	--secondary: var(--color-raised);
+	/* One step above raised, so a secondary button reads as a button on canvas and on surfaces */
+	--secondary: var(--color-gray-800);
 	--secondary-foreground: var(--color-ink);
 	--muted: var(--color-raised);
 	--muted-foreground: var(--color-ink-muted);

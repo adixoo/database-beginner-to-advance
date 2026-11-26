@@ -5,7 +5,7 @@ const year = new Date().getFullYear();
 ---
 
 <footer
-	class="flex flex-col bg-mint px-page pt-10 pb-8 text-on-accent lg:min-h-[90svh]"
+	class="flex flex-col bg-field px-page pt-10 pb-8 text-on-accent lg:min-h-[90svh]"
 	aria-labelledby="footer-title"
 >
 	<div class="flex items-start justify-between gap-8 text-base leading-snug">
@@ -17,34 +17,18 @@ const year = new Date().getFullYear();
 
 	<h2
 		id="footer-title"
-		class="mt-24 text-[clamp(64px,24vw,380px)] leading-[0.8] font-bold tracking-[-0.035em] lg:mt-auto"
+		class="mt-24 text-[clamp(64px,24vw,380px)] leading-[0.8] font-bold tracking-[-0.035em] text-on-accent lg:mt-auto"
 		data-reveal
 		style="--i: 1"
 	>
 		{SITE_NAME}
 	</h2>
 
-	<div
-		class="mt-8 grid gap-2 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-end sm:gap-8"
-		data-reveal
-		style="--i: 2"
-	>
+	<div class="mt-8 flex items-end justify-between gap-8 text-sm" data-reveal style="--i: 2">
 		<ul class="flex gap-6 font-semibold">
 			<li><a href={PATHS.beginner.href} class="link">{PATHS.beginner.label}</a></li>
 			<li><a href={PATHS.advanced.href} class="link">{PATHS.advanced.label}</a></li>
 		</ul>
-		<p class="sm:max-w-[52ch] sm:text-center">
-			Photo:{' '}
-			<a
-				href="https://commons.wikimedia.org/wiki/File:Schlagwortkatalog.jpg"
-				class="underline underline-offset-[0.2em]">“Schlagwortkatalog”</a
-			>{' '}
-			by Dr. Marcus Gossler,{' '}
-			<a
-				href="https://creativecommons.org/licenses/by-sa/3.0/"
-				class="underline underline-offset-[0.2em]">CC BY-SA 3.0</a
-			>, via Wikimedia Commons
-		</p>
-		<p class="whitespace-nowrap sm:text-right">© {year}</p>
+		<p class="whitespace-nowrap">© {year}</p>
 	</div>
 </footer>

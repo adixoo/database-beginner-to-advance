@@ -33,7 +33,7 @@ const { level, title, description, currentTopic, type, jsonLd } = Astro.props;
 				level={level}
 				currentTopic={currentTopic}
 				class:list={[
-					'scrollbar-on-hover max-lg:-mx-3 lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1 lg:block lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto lg:overscroll-contain',
+					'scrollbar-on-hover lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1 lg:block lg:max-h-[calc(100svh-4rem)] lg:overflow-y-auto lg:overscroll-contain',
 					currentTopic && 'hidden',
 				]}
 			/>

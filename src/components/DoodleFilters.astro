@@ -1,0 +1,21 @@
+---
+// Roughen filters for DoodleButton. Put once on a page that uses it. Three seeds: the drawn
+// line, the same line redrawn on hover, and the shadow, so no two wobble alike. The filter
+// region is padded so the displaced edges are not clipped.
+const FILTERS = [
+	{ id: 'doodle', seed: 3 },
+	{ id: 'doodle-redraw', seed: 11 },
+	{ id: 'doodle-shadow', seed: 7 },
+];
+---
+
+<svg width="0" height="0" aria-hidden="true" class="absolute">
+	{
+		FILTERS.map(({ id, seed }) => (
+			<filter {id} x="-10%" y="-40%" width="120%" height="180%">
+				<feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" {seed} />
+				<feDisplacementMap in="SourceGraphic" scale="6" />
+			</filter>
+		))
+	}
+</svg>

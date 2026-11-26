@@ -1,6 +1,9 @@
 ---
-// Links to the sections of the current page. The section in view is marked as it scrolls.
+// Links to the sections of the current page along a rail (src/scripts/rail-toc.ts): a dot per
+// heading, the rail filled in up to the reader, and a small plane that glides to the section in
+// view. Without JavaScript it is a plain list of links.
 import type { MarkdownHeading } from 'astro';
+import { LABEL_GAP, railX } from '../scripts/rail-toc-layout';
 
 interface Props {
 	headings: MarkdownHeading[];
@@ -8,34 +11,85 @@ interface Props {
 }
 
 const { headings, class: className } = Astro.props;
-const sections = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const sections = headings
+	.filter((heading) => heading.depth === 2 || heading.depth === 3)
+	.map((heading) => ({ ...heading, level: heading.depth - 2 }));
 ---
 
 {
 	sections.length > 0 && (
-		<nav class:list={['text-base', className]} aria-labelledby="on-this-page" data-on-this-page>
-			<h2 id="on-this-page" class="font-semibold">
+		<nav
+			class:list={['w-max max-w-72 text-sm', className]}
+			aria-labelledby="on-this-page"
+			data-rail-toc
+		>
+			<h2 id="on-this-page" class="mb-3 flex items-center gap-2 font-semibold text-ink-soft">
+				<svg
+					viewBox="0 0 16 16"
+					class="-ml-0.5 size-3.5"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.5"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<path d="M2 4h12M2 8h8M2 12h10" />
+				</svg>
 				On this page
 			</h2>
-			<ol class="mt-4 flex flex-col gap-1">
+			<ul class="relative" data-rail-list>
 				{sections.map((heading) => (
-					<li class:list={[heading.depth === 3 && 'pl-4']}>
+					<li data-rail-item data-depth={heading.level}>
 						<a
 							href={`#${heading.slug}`}
-							class="-mx-3 block rounded-xl px-3 py-1.5 text-ink-soft transition-colors hover:text-ink aria-current:bg-raised aria-current:font-semibold aria-current:text-ink"
+							class="block rounded-md py-1.5 pr-2 leading-5 text-ink-muted transition-colors duration-200 hover:text-ink-soft aria-[current=location]:font-semibold aria-[current=location]:text-ink"
+							style={`padding-left: ${railX(heading.level) + LABEL_GAP}px`}
 						>
 							{heading.text}
 						</a>
 					</li>
 				))}
-			</ol>
+				{/* The plane; hidden until the script has placed it on the rail */}
+				<div
+					data-rail-plane
+					aria-hidden="true"
+					class="pointer-events-none invisible absolute top-0 left-0 -mt-2 -ml-2 size-4 text-ink opacity-0"
+				>
+					<svg viewBox="0 0 24 24" class="size-4 overflow-visible">
+						<path
+							d="M12 2 20.5 21 12 17.5 3.5 21z"
+							fill="currentColor"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</div>
+			</ul>
 		</nav>
 	)
 }
 
-<script>
-	import { trackActiveSection } from '../scripts/active-section';
+<style>
+	/* Heading dots: an open ring ahead of the reader, filled mint once passed */
+	:global(.rail-dot) {
+		fill: transparent;
+		stroke: var(--color-gray-600);
+		transition:
+			fill 200ms ease,
+			stroke 200ms ease;
+	}
 
-	const nav = document.querySelector<HTMLElement>('[data-on-this-page]');
-	if (nav) trackActiveSection(nav);
+	:global(.rail-dot.is-reached) {
+		fill: var(--color-mint);
+		stroke: var(--color-mint);
+	}
+</style>
+
+<script>
+	import { initRailToc } from '../scripts/rail-toc';
+
+	const nav = document.querySelector<HTMLElement>('[data-rail-toc]');
+	// The reading line sits below the fixed navbar
+	if (nav) initRailToc(nav, { offset: 120 });
 </script>

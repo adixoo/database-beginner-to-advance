@@ -4,6 +4,7 @@ import satori from 'satori';
 import sharp from 'sharp';
 import { SITE_NAME } from '../config/site';
 import { THEME_COLORS } from '../config/theme';
+import { brandMarkStroke, brandMarkSvg } from './brand-mark';
 import { OG_IMAGE_SIZE } from './seo';
 
 export interface OgCard {
@@ -31,6 +32,9 @@ function loadFont(weight: 400 | 700): Promise<Buffer> {
 
 let fonts: Promise<Buffer[]> | undefined;
 
+// The site icon beside the name, at the stroke that suits its size on the card
+const BRAND_MARK = `data:image/svg+xml;base64,${Buffer.from(brandMarkSvg(brandMarkStroke(64))).toString('base64')}`;
+
 function OgImage({ title, label, host }: OgCard) {
 	const size = titleFontSize(title);
 	return (
@@ -50,7 +54,7 @@ function OgImage({ title, label, host }: OgCard) {
 			}}
 		>
 			<div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 48 }}>
-				<div style={{ width: 32, height: 32, borderRadius: 8, background: THEME_COLORS.mint }} />
+				<img src={BRAND_MARK} width={64} height={64} alt="" />
 				<span style={{ fontWeight: 700 }}>{SITE_NAME}</span>
 				{label && <span style={{ color: THEME_COLORS.inkMuted }}>· {label}</span>}
 			</div>

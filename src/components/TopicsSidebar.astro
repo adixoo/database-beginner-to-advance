@@ -12,10 +12,43 @@ interface Props {
 const { level, currentTopic, class: className } = Astro.props;
 const topics = await getTopics(level);
 const headingId = `${level}-topics`;
+
+// Fades at the edges of the list when it scrolls itself (desktop). They stick to the top and
+// bottom of the scrolling box, and each one shows only while there is more list that way.
+const fadeClass =
+	'pointer-events-none sticky z-10 hidden h-16 from-canvas to-transparent opacity-0 transition-opacity duration-200 lg:block';
 ---
 
 <!-- data-lenis-prevent: when the list is taller than the window it scrolls itself, not the page -->
-<aside class={className} aria-labelledby={headingId} data-lenis-prevent>
-	<h2 id={headingId} class="px-3 text-lg font-semibold">{PATHS[level].label} topics</h2>
+<aside class={className} aria-labelledby={headingId} data-lenis-prevent data-scroll-fades>
+	<div aria-hidden="true" data-fade="top" class:list={[fadeClass, 'top-0 -mb-16 bg-linear-to-b']}>
+	</div>
+	<h2 id={headingId} class="pl-0.5 text-lg font-semibold">{PATHS[level].label} topics</h2>
 	<TopicList topics={topics} currentTopic={currentTopic} class="mt-4" />
+	<div
+		aria-hidden="true"
+		data-fade="bottom"
+		class:list={[fadeClass, 'bottom-0 -mt-16 bg-linear-to-t']}
+	>
+	</div>
 </aside>
+
+<script>
+	// Shows the top fade once the list has scrolled, and the bottom one until it reaches its end
+	for (const box of document.querySelectorAll<HTMLElement>('[data-scroll-fades]')) {
+		const top = box.querySelector<HTMLElement>('[data-fade="top"]');
+		const bottom = box.querySelector<HTMLElement>('[data-fade="bottom"]');
+		if (!top || !bottom) continue;
+
+		const update = () => {
+			const scrollable = box.scrollHeight > box.clientHeight + 1;
+			top.style.opacity = scrollable && box.scrollTop > 1 ? '1' : '0';
+			bottom.style.opacity =
+				scrollable && box.scrollTop + box.clientHeight < box.scrollHeight - 1 ? '1' : '0';
+		};
+
+		box.addEventListener('scroll', update, { passive: true });
+		new ResizeObserver(update).observe(box);
+		update();
+	}
+</script>

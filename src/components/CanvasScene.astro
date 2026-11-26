@@ -1,0 +1,37 @@
+---
+// A Canvas 2D animation from src/scripts/canvas. With a `label` it is a picture with that
+// accessible name; without one it is decoration and hidden from assistive tech. At rest it shows
+// its finished frame; `play` says when it animates: on hover (default) or once on load.
+import type { HTMLAttributes } from 'astro/types';
+import type { SceneName } from '../scripts/canvas/scenes';
+import type { PlayOn } from '../scripts/canvas/stage';
+
+interface Props extends Omit<HTMLAttributes<'canvas'>, 'class'> {
+	scene: SceneName;
+	label?: string;
+	play?: PlayOn;
+	class?: string;
+}
+
+const { scene, label, play = 'hover', class: className, ...rest } = Astro.props;
+---
+
+<canvas
+	data-canvas-scene={scene}
+	data-play={play}
+	role={label ? 'img' : undefined}
+	aria-label={label}
+	aria-hidden={label ? undefined : 'true'}
+	class:list={['block', className]}
+	{...rest}>{label}</canvas
+>
+
+<script>
+	import { SCENES, type SceneName } from '../scripts/canvas/scenes';
+	import { mountScene, type PlayOn } from '../scripts/canvas/stage';
+
+	for (const canvas of document.querySelectorAll<HTMLCanvasElement>('[data-canvas-scene]')) {
+		const scene = SCENES[canvas.dataset.canvasScene as SceneName];
+		if (scene) mountScene(canvas, scene, canvas.dataset.play as PlayOn);
+	}
+</script>

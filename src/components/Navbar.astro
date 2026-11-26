@@ -1,9 +1,11 @@
 ---
-// Wordmark plus the level and tool links. From `sm` up the links sit in one row; on phones they
-// fold into a Menu button that opens a full-width list with large tap targets.
-import { ArrowUpRight01Icon } from '@hugeicons/core-free-icons';
+// A menu pill: the site icon and name, the theme switch and a Menu button. Opening widens the
+// pill, grows a panel down over the page and brings in the level and tool links in large type
+// (src/scripts/menu-bar.ts). Without JavaScript the panel simply stays open.
+import { ArrowUpRight01Icon, Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { LEVELS, PATHS, PRACTICE_TOOLS, SITE_NAME, type Level } from '../config/site';
+import { brandMarkStroke, brandMarkSvg } from '../lib/brand-mark';
 
 interface Props {
 	current?: Level;
@@ -11,121 +13,194 @@ interface Props {
 
 const { current } = Astro.props;
 
-const levelLinks = LEVELS.map((level) => ({
-	href: PATHS[level].href,
-	label: PATHS[level].label,
-	current: level === current,
-}));
+// Widest the open pill gets, in px
+const OPEN_WIDTH = 560;
+
+const links = [
+	...LEVELS.map((level) => ({
+		href: PATHS[level].href,
+		label: PATHS[level].label,
+		current: level === current,
+		external: false,
+	})),
+	...PRACTICE_TOOLS.map((tool) => ({
+		href: tool.href,
+		label: tool.navLabel,
+		current: false,
+		external: true,
+	})),
+];
+
+const buttonClass =
+	'flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-[10px] bg-gray-800 text-ink transition-[background-color,scale] duration-150 hover:bg-gray-700 active:scale-[0.96]';
 ---
 
-<header class="relative px-page">
-	<nav aria-label="Main" class="flex items-center justify-between gap-6 py-6 text-lg">
-		<div data-reveal><a href="/" class="font-bold tracking-tight link">{SITE_NAME}</a></div>
-
-		<ul class="hidden flex-wrap items-center justify-end gap-x-8 gap-y-2 sm:flex">
-			{
-				levelLinks.map((link, i) => (
-					<li data-reveal style={`--i: ${i + 1}`}>
-						<a
-							href={link.href}
-							aria-current={link.current ? 'page' : undefined}
-							class="text-ink-soft link aria-[current=page]:text-ink aria-[current=page]:decoration-current"
-						>
-							{link.label}
-						</a>
-					</li>
-				))
-			}
-			<!-- External practice tools, set apart from the levels by a wider gap -->
-			{
-				PRACTICE_TOOLS.map((tool, i) => (
-					<li
-						class:list={[i === 0 && 'md:ml-6']}
-						data-reveal
-						style={`--i: ${LEVELS.length + i + 1}`}
+<!-- Holds the header's place in the page (pt-6 + h-15 + pb-2 = 92px), since the header is fixed -->
+<div aria-hidden="true" class="h-23"></div>
+<!-- Backdrop behind the open menu: dims the page, fades with the menu, and a click on it closes
+     the menu (menu-bar.ts). Hidden, and unclickable, while the menu is closed. It sits outside the
+     header, because the header slides with a transform, which would trap a fixed child inside it. -->
+<div
+	data-menu-overlay
+	aria-hidden="true"
+	class="invisible fixed inset-0 z-40 bg-canvas/75 opacity-0"
+>
+</div>
+<!-- Fixed: the pill stays at the top of the screen on every part of every page (sliding away while the reader scrolls down). In front of the
+     page, so the open panel covers it; only the pill itself takes clicks, the rest of the strip
+     lets them through to the page. -->
+<header class="pointer-events-none fixed inset-x-0 top-0 z-50 px-page pt-6 pb-2">
+	<!-- Centred, and fixed to the closed bar's height so opening grows downward (and out to both sides) over the page -->
+	<div class="flex h-15 max-w-full items-start justify-center">
+		<nav
+			aria-label="Main"
+			data-menu-bar
+			data-open-width={OPEN_WIDTH}
+			class="pointer-events-auto w-fit max-w-full rounded-2xl bg-surface p-2"
+		>
+			<div class="flex items-center justify-between gap-3 pl-3">
+				<a
+					href="/"
+					class="group/home flex items-center rounded-sm text-lg font-bold tracking-tight text-ink"
+				>
+					<!-- The site icon (same drawing as the favicon); the name beside it is the link text -->
+					<span
+						aria-hidden="true"
+						class="size-8 shrink-0 transition-transform duration-150 motion-safe:group-hover/home:-rotate-6 [&>svg]:size-full"
+						set:html={brandMarkSvg(brandMarkStroke(32))}
+					/>
+					<!-- The name shows only while the menu is open (menu-bar.ts slides it out); it stays in
+					     the page for screen readers, and stays visible without JavaScript -->
+					<span
+						data-menu-name
+						class="overflow-hidden whitespace-nowrap in-[.js]:w-0 in-[.js]:opacity-0"
 					>
-						<a
-							href={tool.href}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-1 text-ink-soft link"
-						>
-							{tool.navLabel}
-							<HugeiconsIcon
-								icon={ArrowUpRight01Icon}
-								size={16}
-								strokeWidth={2}
-								aria-hidden="true"
-							/>
-							<span class="sr-only">(opens in a new tab)</span>
-						</a>
-					</li>
-				))
-			}
-		</ul>
+						<span class="block pl-2.5 link group-hover/home:decoration-current">{SITE_NAME}</span>
+					</span>
+				</a>
 
-		<!-- No data-reveal here: its transform would make the menu, not the header, the frame
-			     the full-width panel is positioned in -->
-		<details class="group sm:hidden" data-nav-menu>
-			<summary
-				class="flex h-11 cursor-pointer list-none items-center rounded-full bg-raised px-5 text-base font-semibold text-ink transition-colors hover:bg-gray-800 [&::-webkit-details-marker]:hidden"
+				<div class="flex items-center gap-2">
+					<!-- Pressed = dark theme. Shows the sun in dark (where it leads) and the moon in light. -->
+					<button
+						type="button"
+						aria-label="Dark theme"
+						aria-pressed="true"
+						data-theme-toggle
+						class:list={[buttonClass, 'w-11']}
+					>
+						<HugeiconsIcon
+							icon={Sun03Icon}
+							size={20}
+							strokeWidth={2}
+							aria-hidden="true"
+							className="hidden dark:block"
+						/>
+						<HugeiconsIcon
+							icon={Moon02Icon}
+							size={20}
+							strokeWidth={2}
+							aria-hidden="true"
+							className="dark:hidden"
+						/>
+					</button>
+
+					<button
+						type="button"
+						aria-expanded="false"
+						aria-controls="site-menu"
+						data-menu-toggle
+						class:list={[
+							buttonClass,
+							'group gap-3 px-5 text-base font-semibold motion-safe:hover:scale-[1.03]',
+						]}
+					>
+						<span data-menu-label>Menu</span>
+						<!-- grid-dashboard-circle (Solid) by Pikaicons, https://pikaicons.com, free for commercial use -->
+						<svg
+							viewBox="0 0 24 24"
+							aria-hidden="true"
+							class="size-[18px] fill-current transition-[rotate] duration-250 motion-safe:group-hover:rotate-90"
+						>
+							<path d="M6.5 2C4.01 2 2 4.01 2 6.5S4.01 11 6.5 11 11 8.99 11 6.5 8.99 2 6.5 2"
+							></path>
+							<path
+								d="M17.5 2C15.01 2 13 4.01 13 6.5s2.01 4.5 4.5 4.5S22 8.99 22 6.5 19.99 2 17.5 2"
+							></path>
+							<path
+								d="M6.5 13C4.01 13 2 15.01 2 17.5S4.01 22 6.5 22s4.5-2.01 4.5-4.5S8.99 13 6.5 13"
+							></path>
+							<path
+								d="M17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5"
+							></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+
+			<!-- contain: inline-size stops the hidden links from widening the closed bar. With JavaScript
+			     on (the .js class is set in the head) it starts collapsed, so no open menu flashes while a
+			     page loads; without it, the links simply show. -->
+			<div
+				id="site-menu"
+				data-menu-panel
+				class="overflow-hidden contain-[inline-size] in-[.js]:h-0"
 			>
-				<span class="group-open:hidden">Menu</span>
-				<span class="hidden group-open:inline">Close</span>
-			</summary>
-			<ul
-				class="absolute inset-x-0 top-full z-50 hidden flex-col bg-surface px-page pt-2 pb-6 group-open:flex"
-			>
-				{
-					levelLinks.map((link) => (
-						<li>
-							<a
-								href={link.href}
-								aria-current={link.current ? 'page' : undefined}
-								class="flex min-h-14 items-center text-2xl font-semibold text-ink-soft aria-[current=page]:text-ink"
-							>
-								{link.label}
-							</a>
-						</li>
-					))
-				}
-				{
-					PRACTICE_TOOLS.map((tool) => (
-						<li>
-							<a
-								href={tool.href}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="flex min-h-14 items-center gap-2 text-2xl font-semibold text-ink-soft"
-							>
-								{tool.navLabel}
-								<HugeiconsIcon
-									icon={ArrowUpRight01Icon}
-									size={22}
-									strokeWidth={2}
-									aria-hidden="true"
-								/>
-								<span class="sr-only">(opens in a new tab)</span>
-							</a>
-						</li>
-					))
-				}
-			</ul>
-		</details>
-	</nav>
+				<ul class="grid gap-1 px-3 pt-8 pb-4">
+					{
+						links.map((link) => (
+							<li data-menu-item>
+								<a
+									href={link.href}
+									aria-current={link.current ? 'page' : undefined}
+									target={link.external ? '_blank' : undefined}
+									rel={link.external ? 'noopener noreferrer' : undefined}
+									class="inline-flex items-center gap-2 rounded-sm text-[clamp(32px,8vw,44px)] leading-[1.1] font-bold tracking-[-0.02em] text-ink decoration-mint decoration-[0.08em] underline-offset-[0.14em] transition-opacity duration-150 hover:opacity-50 aria-[current=page]:underline"
+								>
+									{link.label}
+									{link.external && (
+										<>
+											<HugeiconsIcon
+												icon={ArrowUpRight01Icon}
+												size={52}
+												strokeWidth={2.25}
+												aria-hidden="true"
+												className="my-[-0.1em] size-[1.2em] text-ink-soft"
+											/>
+											<span class="sr-only">(opens in a new tab)</span>
+										</>
+									)}
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</div>
+		</nav>
+	</div>
 </header>
 
 <script>
-	// Close the phone menu on Escape or a tap outside it
-	const menu = document.querySelector<HTMLDetailsElement>('[data-nav-menu]');
-	if (menu) {
-		document.addEventListener('keydown', (event) => {
-			if (event.key !== 'Escape' || !menu.open) return;
-			menu.open = false;
-			menu.querySelector('summary')?.focus();
-		});
-		document.addEventListener('click', (event) => {
-			if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
+	import { initMenuBar } from '../scripts/menu-bar';
+	import { initThemeToggle } from '../scripts/theme';
+
+	initThemeToggle(document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]'));
+
+	const nav = document.querySelector<HTMLElement>('[data-menu-bar]');
+	const toggle = nav?.querySelector<HTMLButtonElement>('[data-menu-toggle]');
+	const label = nav?.querySelector<HTMLElement>('[data-menu-label]');
+	const name = nav?.querySelector<HTMLElement>('[data-menu-name]');
+	const overlay = document.querySelector<HTMLElement>('[data-menu-overlay]');
+	const panel = nav?.querySelector<HTMLElement>('[data-menu-panel]');
+	if (nav && toggle && label && overlay && name && panel) {
+		initMenuBar({
+			nav,
+			toggle,
+			label,
+			overlay,
+			name,
+			panel,
+			items: [...nav.querySelectorAll<HTMLElement>('[data-menu-item]')],
+			openWidth: Number(nav.dataset.openWidth),
 		});
 	}
 </script>

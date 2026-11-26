@@ -1,11 +1,15 @@
 ---
-// The level's topics folded into one row on phones and tablets, where the sidebar would only
-// appear after the whole article. Tap it to open the list; it closes when a topic is chosen.
-import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+// The level's topics on phones and tablets, where the sidebar is not shown. A bar names the
+// level and where the reader is; tapping it slides a panel in from the left with every topic,
+// to switch to another (src/scripts/topics-drawer.ts). A round button in the bottom-left corner,
+// the twin of back-to-top, opens the same panel from anywhere down the page. Without JavaScript the bar is a link to
+// the level page, which lists them all.
+import { ArrowRight01Icon, Cancel01Icon, SidebarLeft01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { PATHS, type Level } from '../config/site';
 import { getTopics } from '../lib/topics';
 import TopicList from './TopicList.astro';
+import { cornerButtonClass } from './corner-button';
 
 interface Props {
 	level: Level;
@@ -16,23 +20,107 @@ interface Props {
 const { level, currentTopic, class: className } = Astro.props;
 const topics = await getTopics(level);
 const position = topics.findIndex((topic) => topic.id === currentTopic) + 1;
+const label = `${PATHS[level].label} topics`;
+const progress = position > 0 ? `${position} of ${topics.length}` : '';
+const dialogId = `${level}-topics-drawer`;
+const titleId = `${dialogId}-title`;
 ---
 
-<details class:list={['group rounded-[20px] bg-surface', className]}>
-	<summary
-		class="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 font-semibold [&::-webkit-details-marker]:hidden"
+<a
+	href={PATHS[level].href}
+	data-drawer-trigger
+	aria-haspopup="dialog"
+	aria-expanded="false"
+	aria-controls={dialogId}
+	class:list={[
+		'group flex min-h-14 items-center justify-between gap-4 rounded-[20px] bg-surface px-5 font-semibold text-ink transition-colors duration-150 hover:bg-raised',
+		className,
+	]}
+>
+	<span class="flex items-center gap-3">
+		<HugeiconsIcon icon={SidebarLeft01Icon} size={20} strokeWidth={2} aria-hidden="true" />
+		{label}
+	</span>
+	<span class="flex items-center gap-2 text-sm font-normal text-ink-muted">
+		{progress}
+		<HugeiconsIcon
+			icon={ArrowRight01Icon}
+			size={20}
+			strokeWidth={2}
+			aria-hidden="true"
+			className="text-ink transition-transform duration-150 motion-safe:group-hover:translate-x-0.5"
+		/>
+	</span>
+</a>
+
+<!-- Bottom-left twin of the back-to-top button: opens the topics from anywhere down the page.
+     Below desktop only, where the sidebar is not on screen. -->
+<button
+	type="button"
+	data-drawer-trigger
+	data-drawer-corner
+	aria-label={`Show ${label.toLowerCase()}`}
+	aria-haspopup="dialog"
+	aria-expanded="false"
+	aria-controls={dialogId}
+	inert
+	class={cornerButtonClass('left', 'lg:hidden')}
+>
+	<HugeiconsIcon icon={SidebarLeft01Icon} size={20} strokeWidth={2} aria-hidden="true" />
+</button>
+
+<!-- data-lenis-prevent: wheel and touch inside the drawer scroll the drawer, never the page -->
+<dialog
+	id={dialogId}
+	aria-labelledby={titleId}
+	data-drawer
+	data-lenis-prevent
+	class="m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 text-ink backdrop:bg-transparent"
+>
+	<div data-drawer-overlay class="invisible fixed inset-0 bg-canvas/75 opacity-0"></div>
+	<div
+		data-drawer-panel
+		class="fixed inset-y-0 left-0 flex w-[min(86vw,380px)] flex-col rounded-r-3xl bg-surface"
 	>
-		<span>{PATHS[level].label} topics</span>
-		<span class="flex items-center gap-2 text-sm font-normal text-ink-muted">
-			{position > 0 && `${position} of ${topics.length}`}
-			<HugeiconsIcon
-				icon={ArrowDown01Icon}
-				size={20}
-				strokeWidth={2}
-				aria-hidden="true"
-				className="text-ink transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
-			/>
-		</span>
-	</summary>
-	<TopicList topics={topics} currentTopic={currentTopic} class="px-2 pb-3" />
-</details>
+		<div class="flex items-start justify-between gap-4 px-5 pt-5">
+			<div>
+				<h2 id={titleId} class="text-lg font-semibold">{label}</h2>
+				{progress && <p class="mt-0.5 text-sm text-ink-muted">You are on {progress}</p>}
+			</div>
+			<button
+				type="button"
+				data-drawer-close
+				aria-label="Close topics"
+				class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-[10px] bg-gray-800 transition-[background-color,scale] duration-150 hover:bg-gray-700 active:scale-[0.96]"
+			>
+				<HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={2} aria-hidden="true" />
+			</button>
+		</div>
+		<div class="mt-4 flex-1 scrollbar-on-hover overflow-y-auto overscroll-contain px-5 pb-8">
+			<TopicList topics={topics} currentTopic={currentTopic} />
+		</div>
+	</div>
+</dialog>
+
+<script>
+	import { revealAfterFirstScreen } from '../scripts/reveal-after-scroll';
+	import { initTopicsDrawer } from '../scripts/topics-drawer';
+
+	const triggers = [...document.querySelectorAll<HTMLElement>('[data-drawer-trigger]')];
+	const corner = document.querySelector<HTMLElement>('[data-drawer-corner]');
+	if (corner) revealAfterFirstScreen(corner);
+	const dialog = document.querySelector<HTMLDialogElement>('[data-drawer]');
+	const overlay = dialog?.querySelector<HTMLElement>('[data-drawer-overlay]');
+	const panel = dialog?.querySelector<HTMLElement>('[data-drawer-panel]');
+	const close = dialog?.querySelector<HTMLButtonElement>('[data-drawer-close]');
+	if (triggers.length && dialog && overlay && panel && close) {
+		initTopicsDrawer({
+			triggers,
+			dialog,
+			overlay,
+			panel,
+			close,
+			items: [...panel.querySelectorAll<HTMLElement>('[data-hook-item]')],
+		});
+	}
+</script>

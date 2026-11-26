@@ -1,6 +1,7 @@
 ---
-// A level's topics as links, in order, with the current one marked. Shared by the desktop
-// sidebar (TopicsSidebar) and the phone menu (TopicsMenu).
+// A level's topics as links, in order. A dashed mint line runs down to the current topic and
+// hooks into it, and a faint hook follows the topic under the pointer (src/scripts/hook-list.ts).
+// Shared by the desktop sidebar (TopicsSidebar) and the phone menu (TopicsMenu).
 import type { Topic } from '../lib/topics';
 import { topicHref } from '../lib/topics';
 
@@ -11,24 +12,62 @@ interface Props {
 }
 
 const { topics, currentTopic, class: className } = Astro.props;
+
+const rails = [
+	{ name: 'hover', tone: 'text-gray-600' },
+	{ name: 'active', tone: 'text-mint' },
+] as const;
 ---
 
 {
 	topics.length ? (
-		<ol class:list={['flex flex-col gap-1', className]}>
-			{topics.map((topic) => (
-				<li>
-					<a
-						href={topicHref(topic)}
-						aria-current={topic.id === currentTopic ? 'page' : undefined}
-						class="block rounded-xl px-3 py-2.5 text-base text-ink-soft transition-colors hover:bg-raised hover:text-ink aria-[current=page]:bg-raised aria-[current=page]:font-semibold aria-[current=page]:text-ink lg:py-2"
+		<div class:list={['relative', className]} data-hook-list>
+			{/* The hover hook first, so the current topic's hook draws over it */}
+			{rails.map(({ name, tone }) => (
+				<span
+					data-hook-rail={name}
+					aria-hidden="true"
+					class:list={['pointer-events-none invisible absolute inset-0 opacity-0', tone]}
+				>
+					{/* A dashed line in the rail colour, drawn upward so the dashes meet the curl cleanly */}
+					<span
+						data-hook-line
+						class="absolute left-0.5 h-0 w-px bg-[repeating-linear-gradient(to_top,transparent_0_2px,currentColor_2px_4px)]"
+					/>
+					<svg
+						data-hook-corner
+						width="12"
+						height="7"
+						viewBox="0 0 12 7"
+						fill="none"
+						class="absolute top-0 left-0.5"
 					>
-						{topic.data.title}
-					</a>
-				</li>
+						<path d="M0.5 0a6 6 0 0 0 6 6H12" stroke="currentColor" stroke-dasharray="2 2" />
+					</svg>
+				</span>
 			))}
-		</ol>
+			<ol class="flex flex-col gap-0.5">
+				{topics.map((topic) => (
+					<li>
+						<a
+							href={topicHref(topic)}
+							data-hook-item
+							aria-current={topic.id === currentTopic ? 'page' : undefined}
+							class="block rounded-lg py-2 pr-2 pl-5 text-base text-ink-muted transition-colors duration-200 hover:text-ink-soft aria-[current=page]:font-semibold aria-[current=page]:text-ink motion-reduce:transition-none lg:py-1.5"
+						>
+							{topic.data.title}
+						</a>
+					</li>
+				))}
+			</ol>
+		</div>
 	) : (
-		<p class:list={['px-3 text-base text-ink-soft', className]}>No topics yet.</p>
+		<p class:list={['text-base text-ink-soft', className]}>No topics yet.</p>
 	)
 }
+
+<script>
+	import { initHookList } from '../scripts/hook-list';
+
+	for (const list of document.querySelectorAll<HTMLElement>('[data-hook-list]')) initHookList(list);
+</script>

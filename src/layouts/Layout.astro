@@ -27,7 +27,7 @@ const imageUrl = new URL(image ?? ogImagePath(Astro.url.pathname), site).href;
 const fontsHref =
 	'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700' +
 	'&family=JetBrains+Mono:wght@400;500' + // taste-skill-ignore: code blocks only
-	'&family=Caveat:wght@600' +
+	'&family=Caveat:wght@400;600' +
 	'&display=swap';
 ---
 
@@ -41,7 +41,12 @@ const fontsHref =
 		<meta name="description" content={description} />
 		<title>{title}</title>
 		{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
-		<meta name="theme-color" content={THEME_COLORS.canvas} />
+		<meta
+			name="theme-color"
+			content={THEME_COLORS.canvas}
+			data-dark={THEME_COLORS.canvas}
+			data-light={THEME_COLORS.canvasLight}
+		/>
 		<link rel="sitemap" href="/sitemap.xml" />
 
 		<meta property="og:site_name" content={SITE_NAME} />
@@ -73,6 +78,22 @@ const fontsHref =
 		<link rel="stylesheet" href={fontsHref} />
 		<script is:inline>
 			document.documentElement.classList.add('js');
+			// Pick the theme before first paint so there is no flash: the saved choice, else the
+			// system's. Keep the storage key in step with src/scripts/theme.ts.
+			(() => {
+				let saved = null;
+				try {
+					saved = localStorage.getItem('theme');
+				} catch {
+					// Storage blocked: fall back to the system theme
+				}
+				const dark = saved
+					? saved === 'dark'
+					: !matchMedia('(prefers-color-scheme: light)').matches;
+				document.documentElement.classList.toggle('dark', dark);
+				const meta = document.querySelector('meta[name="theme-color"]');
+				if (meta) meta.content = dark ? meta.dataset.dark : meta.dataset.light;
+			})();
 		</script>
 	</head>
 	<body>

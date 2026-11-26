@@ -1,0 +1,108 @@
+---
+// A hand-drawn button for the landing page: a pill drawn in ink with a handwritten label and an
+// offset doodle shadow. Hover lifts it and redraws the line; pressing sinks it into the paper.
+// Needs <DoodleFilters /> once on the page.
+interface Props {
+	href: string;
+	variant?: 'primary' | 'secondary';
+	class?: string;
+}
+
+const { href, variant = 'primary', class: className } = Astro.props;
+---
+
+<a {href} data-variant={variant} class:list={['doodle-button', className]}>
+	<slot />
+</a>
+
+<style>
+	.doodle-button {
+		--fill: var(--color-field);
+		--on-fill: var(--color-on-accent);
+
+		position: relative;
+		isolation: isolate;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 3.75rem;
+		padding: 0 2.25rem;
+		border-radius: 999px;
+		color: var(--on-fill);
+		font-family: var(--font-hand);
+		font-size: 1.75rem;
+		font-weight: 600;
+		line-height: 1.05;
+		text-align: center;
+		/* One line, unless the screen is too narrow for it (a long label on a 320px phone) */
+		max-width: 100%;
+		padding-block: 0.4rem;
+		text-wrap: balance;
+		outline: none;
+	}
+
+	.doodle-button[data-variant='secondary'] {
+		--fill: var(--color-canvas);
+		--on-fill: var(--color-ink);
+	}
+
+	/* The drawn pill (fill and ink outline, roughened as one shape) and its offset shadow */
+	.doodle-button::before,
+	.doodle-button::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+	}
+
+	.doodle-button::before {
+		z-index: -1;
+		border: 2.5px solid var(--color-ink);
+		background: var(--fill);
+		filter: url(#doodle);
+	}
+
+	.doodle-button::after {
+		z-index: -2;
+		background: var(--color-ink);
+		translate: 4px 5px;
+		filter: url(#doodle-shadow);
+	}
+
+	.doodle-button:focus-visible {
+		outline: 3px solid var(--color-mint);
+		outline-offset: 8px;
+	}
+
+	@media (hover: hover) {
+		.doodle-button:hover::before {
+			filter: url(#doodle-redraw);
+		}
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.doodle-button,
+		.doodle-button::after {
+			transition: translate 150ms var(--ease-enter);
+		}
+
+		@media (hover: hover) {
+			.doodle-button:hover {
+				translate: -1px -2px;
+			}
+
+			.doodle-button:hover::after {
+				translate: 6px 8px;
+			}
+		}
+
+		.doodle-button:active {
+			translate: 3px 4px;
+		}
+
+		.doodle-button:active::after {
+			translate: 1px 1px;
+		}
+	}
+</style>

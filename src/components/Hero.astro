@@ -1,49 +1,53 @@
 ---
-import { Image } from 'astro:assets';
-import drawer from '../assets/card-catalogue-drawer.jpg';
-import { buttonVariants } from '@/components/ui/button';
+// The first screen: what this is and the two ways in on the left, a live mockup of the first
+// lesson (making a table) on the right.
 import { PATHS } from '../config/site';
+import CanvasScene from './CanvasScene.astro';
+import DoodleButton from './DoodleButton.astro';
 ---
 
 <section
-	class="flex flex-1 flex-col justify-end px-page pt-20 pb-24 lg:pt-16 lg:pb-[clamp(48px,9svh,112px)]"
+	class="grid flex-1 content-end gap-14 px-page pt-14 pb-24 lg:grid-cols-2 lg:content-center lg:items-end lg:gap-16 lg:pt-10 lg:pb-[clamp(48px,9svh,112px)]"
 >
-	<h1
-		class="text-[14vw] leading-[0.95] font-bold tracking-[-0.03em] text-ink lg:text-[min(12vw,184px)]"
-		aria-label="Learn about databases"
-	>
-		<span class="block" data-reveal>Learn about</span>
-		<span class="block whitespace-nowrap" data-reveal style="--i: 1">
-			<span
-				data-shutter
-				class="relative mr-[0.06em] inline-block h-[0.72em] w-[1.5em] overflow-hidden rounded-[0.12em] align-baseline sm:w-[2.2em]"
-			>
-				<Image
-					src={drawer}
-					alt="An open drawer of a library card catalogue, full of index cards"
-					widths={[240, 480, 800]}
-					sizes="(min-width: 640px) 26vw, 19vw"
-					loading="eager"
-					fetchpriority="high"
-					class="absolute inset-0 size-full object-cover object-[42%_58%]"
+	<div>
+		<!-- Desktop follows the taste skill's study (~8vw); phones fill the width (16.5vw), so the title reads big in a narrow screen -->
+		<h1
+			class="text-[clamp(44px,16.5vw,84px)] leading-[0.95] font-bold tracking-[-0.035em] text-ink sm:text-[clamp(84px,13vw,120px)] lg:text-[clamp(72px,8vw,136px)]"
+			aria-label="Learn about databases"
+		>
+			<span class="block" data-reveal>Learn about</span>
+			<span class="relative inline-block whitespace-nowrap" data-reveal style="--i: 1">
+				databases
+				<!-- Hand-drawn underline, drawn in once the word is in -->
+				<CanvasScene
+					scene="underline"
+					play="load"
+					class="pointer-events-none absolute inset-x-0 bottom-[-0.16em] w-full"
 				/>
 			</span>
-			databases
-		</span>
-	</h1>
+		</h1>
 
-	<p
-		class="mt-10 max-w-[30ch] text-[clamp(20px,1.8vw,26px)] leading-snug text-ink-body"
-		data-reveal
-		style="--i: 2"
-	>
-		Start as a beginner, or go straight to advanced.
-	</p>
+		<p
+			class="mt-10 max-w-[30ch] text-[clamp(20px,1.6vw,24px)] leading-snug text-ink-body"
+			data-reveal
+			style="--i: 2"
+		>
+			Start as a beginner, or go straight to advanced.
+		</p>
 
-	<div class="mt-8 flex flex-wrap gap-3" data-reveal style="--i: 3">
-		<a href={PATHS.beginner.href} class={buttonVariants({ size: 'lg' })}> Start as beginner </a>
-		<a href={PATHS.advanced.href} class={buttonVariants({ variant: 'secondary', size: 'lg' })}>
-			Start advanced
-		</a>
+		<div class="mt-9 flex flex-col gap-5 sm:flex-row" data-reveal style="--i: 3">
+			<DoodleButton href={PATHS.beginner.href} class="sm:min-w-56">Start as beginner</DoodleButton>
+			<DoodleButton href={PATHS.advanced.href} variant="secondary" class="sm:min-w-56">
+				Start advanced
+			</DoodleButton>
+		</div>
+	</div>
+
+	<div data-reveal style="--i: 2">
+		<CanvasScene
+			scene="table"
+			label="Animation: CREATE TABLE users is typed, then three users, asha.codes, ravi.clicks and meera.eats, are added as rows"
+			class="w-full"
+		/>
 	</div>
 </section>
