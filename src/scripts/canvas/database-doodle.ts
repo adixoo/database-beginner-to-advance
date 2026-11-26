@@ -3,21 +3,10 @@
 // once, at the loosest wobble.
 import { createSketch, sketchScene, type Pt } from './sketch';
 
-const {
-	strokes,
-	random,
-	R,
-	pen,
-	add,
-	seg,
-	arc,
-	ellipse,
-	roundPoly,
-	dot,
-	text,
-	strand,
-	texturedMass,
-} = createSketch(20261127, 2.5);
+const { strokes, pen, add, seg, arc, ellipse, roundPoly, dot, text, hairMop } = createSketch(
+	20261127,
+	2.5,
+);
 
 // Colours follow DESIGN.md: peach the question, sky the database, lilac the book, butter for
 // annotation (labels and the hand-drawn arrow); the person and the furniture stay in ink.
@@ -44,64 +33,33 @@ seg(208, 330, 248, 338);
 pen('ink');
 
 // Hair: combed out from a crown at the upper back of the head, falling forward into a fringe
-const crown: Pt = [318, 205];
-const hairDir = (x: number, y: number) => {
-	let a = Math.atan2(y - crown[1], x - crown[0]);
-	if (y > 415) {
-		const k = Math.min(1, (y - 415) / 70) * 0.65;
-		a = a * (1 - k) + (Math.PI / 2 + 0.15) * k;
-	}
-	return a;
-};
-// Silhouette: a rounded mop with pointed tufts that follow the flow
-const hair: Pt[] = [];
-const [hcx, hcy, steps] = [462, 398, 46];
-const tuftAt = new Set<number>();
-for (let i = 3; i < steps - 2; i += 3 + Math.floor(random() * 3)) tuftAt.add(i);
-for (let i = 0; i <= steps; i++) {
-	const a = Math.PI * 0.95 + (i / steps) * Math.PI * 1.1;
-	const r = 152 + R(4);
-	const p: Pt = [hcx + r * Math.cos(a), hcy + r * Math.sin(a)];
-	if (tuftAt.has(i)) {
-		const fa = hairDir(p[0], p[1]);
-		const ta = Math.atan2(Math.sin(a) + Math.sin(fa) * 1.2, Math.cos(a) + Math.cos(fa) * 1.2);
-		const L = 16 + random() * 26;
-		hair.push([p[0] + Math.cos(ta) * L, p[1] + Math.sin(ta) * L]);
-	} else hair.push(p);
-}
-hair.push(
-	[625, 442],
-	[606, 428],
-	[594, 454],
-	[574, 426],
-	[554, 458],
-	[532, 428],
-	[510, 464],
-	[488, 436],
-	[464, 480],
-	[440, 452],
-	[416, 504],
-	[394, 478],
-	[366, 510],
-	[348, 470],
-	[320, 492],
-	[302, 450],
-);
-texturedMass(hair, {
-	dir: hairDir,
-	count: 120,
-	fine: 70,
-	margin: 14,
-	fineMargin: 8,
-	len: [35, 105],
-	w: [1.2, 2.7],
+hairMop({
+	crown: [318, 205],
+	fringeY: 415,
+	centre: [462, 398],
+	radius: 152,
+	sweep: 1.1,
+	tuft: [16, 26],
+	fringe: [
+		[625, 442],
+		[606, 428],
+		[594, 454],
+		[574, 426],
+		[554, 458],
+		[532, 428],
+		[510, 464],
+		[488, 436],
+		[464, 480],
+		[440, 452],
+		[416, 504],
+		[394, 478],
+		[366, 510],
+		[348, 470],
+		[320, 492],
+		[302, 450],
+	],
+	mass: { count: 120, fine: 70, margin: 14, fineMargin: 8, len: [35, 105], w: [1.2, 2.7] },
 });
-// A few flyaway hairs at the top
-for (let k = 0; k < 4; k++) {
-	const p = hair[5 + Math.floor(random() * (steps - 10))]!;
-	const ang = Math.atan2(p[1] - hcy, p[0] - hcx) * 0.5 + hairDir(p[0], p[1]) * 0.5;
-	strand(p[0] - Math.cos(ang) * 6, p[1] - Math.sin(ang) * 6, ang, 16 + random() * 18, R(0.9), 1.6);
-}
 
 // Face: jaw, ear, eyebrow, eyes, an "o" mouth
 add([

@@ -75,6 +75,21 @@ export interface MassOptions {
 	w: Pt;
 }
 
+export interface HairOptions {
+	// Hair combs out from the crown, then falls forward into a fringe below fringeY
+	crown: Pt;
+	fringeY: number;
+	// The rounded top of the mop: an arc around centre, sweeping `sweep` half-turns
+	centre: Pt;
+	radius: number;
+	sweep: number;
+	// Tuft length: base plus up to extra
+	tuft: Pt;
+	// The jagged fringe, from the back of the head to the front
+	fringe: Pt[];
+	mass: Omit<MassOptions, 'dir'>;
+}
+
 /* ---------- pure geometry ---------- */
 const dist = (a: Pt, b: Pt) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 
@@ -367,6 +382,48 @@ export function createSketch(seed: number, wobbleAmount: number) {
 		strokes.push({ kind: 'mass', outline, strands, edge: makePath(outline, { w: 0.95 }) });
 	};
 
+	// A rounded mop of hair with pointed tufts that follow the flow, and a few flyaways on top
+	const hairMop = (o: HairOptions) => {
+		const [cx, cy] = o.centre;
+		const dir = (x: number, y: number) => {
+			let a = Math.atan2(y - o.crown[1], x - o.crown[0]);
+			if (y > o.fringeY) {
+				const k = Math.min(1, (y - o.fringeY) / 70) * 0.65;
+				a = a * (1 - k) + (Math.PI / 2 + 0.15) * k;
+			}
+			return a;
+		};
+		const steps = 46;
+		const hair: Pt[] = [];
+		const tuftAt = new Set<number>();
+		for (let i = 3; i < steps - 2; i += 3 + Math.floor(random() * 3)) tuftAt.add(i);
+		for (let i = 0; i <= steps; i++) {
+			const a = Math.PI * 0.95 + (i / steps) * Math.PI * o.sweep;
+			const r = o.radius + R(4);
+			const p: Pt = [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+			if (tuftAt.has(i)) {
+				const fa = dir(p[0], p[1]);
+				const ta = Math.atan2(Math.sin(a) + Math.sin(fa) * 1.2, Math.cos(a) + Math.cos(fa) * 1.2);
+				const L = o.tuft[0] + random() * o.tuft[1];
+				hair.push([p[0] + Math.cos(ta) * L, p[1] + Math.sin(ta) * L]);
+			} else hair.push(p);
+		}
+		hair.push(...o.fringe);
+		texturedMass(hair, { dir, ...o.mass });
+		for (let k = 0; k < 4; k++) {
+			const p = hair[5 + Math.floor(random() * (steps - 10))]!;
+			const ang = Math.atan2(p[1] - cy, p[0] - cx) * 0.5 + dir(p[0], p[1]) * 0.5;
+			strand(
+				p[0] - Math.cos(ang) * 6,
+				p[1] - Math.sin(ang) * 6,
+				ang,
+				16 + random() * 18,
+				R(0.9),
+				1.6,
+			);
+		}
+	};
+
 	return {
 		strokes,
 		random,
@@ -384,6 +441,7 @@ export function createSketch(seed: number, wobbleAmount: number) {
 		text,
 		strand,
 		texturedMass,
+		hairMop,
 	};
 }
 
@@ -601,11 +659,7 @@ export function sketchScene(strokes: Stroke[], width: number, height: number): S
 
 			// Then only the strokes still being drawn
 			ctx.save();
-			ctx.setTransform(transform);
-			ctx.translate(width * 0.03, height * 0.03);
-			ctx.scale(0.94, 0.94);
-			ctx.lineCap = 'round';
-			ctx.lineJoin = 'round';
+			prepare(ctx, transform);
 			for (let i = layer.committed; i < strokes.length && startOf(i) <= t; i++) {
 				const p = progress(t, startOf(i), endOf(i));
 				if (p > 0) drawStroke(ctx, strokes[i]!, p, base, colors);

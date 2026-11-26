@@ -1,12 +1,10 @@
 // Advanced mockup: a hand-drawn doodle of a frowning developer at a laptop, surrounded by a
 // database with a gear, a query plan, an index tree and a rising chart. Drawn on fast, once,
 // at the loosest wobble.
-import { createSketch, sketchScene, type Pt } from './sketch';
+import { createSketch, sketchScene } from './sketch';
 
 const {
 	strokes,
-	random,
-	R,
 	pen,
 	add,
 	seg,
@@ -18,8 +16,8 @@ const {
 	gear,
 	dot,
 	text,
-	strand,
 	texturedMass,
+	hairMop,
 } = createSketch(20261126, 2.5);
 
 // Colours follow DESIGN.md: sky the database, lilac the query plan, mint the index tree and
@@ -90,60 +88,32 @@ arc(586, 612, 28, 30, Math.PI * 1.42, Math.PI * 0.58);
 arc(590, 612, 11, 13, Math.PI * 1.3, Math.PI * 0.75, { w: 0.8 });
 
 // Hair: combed out from the crown, falling into a spiky fringe
-const crown: Pt = [540, 315];
-const hairDir = (x: number, y: number) => {
-	let a = Math.atan2(y - crown[1], x - crown[0]);
-	if (y > 430) {
-		const k = Math.min(1, (y - 430) / 70) * 0.65;
-		a = a * (1 - k) + (Math.PI / 2 + 0.15) * k;
-	}
-	return a;
-};
-const hair: Pt[] = [];
-const [hcx, hcy, steps] = [690, 470, 46];
-const tuftAt = new Set<number>();
-for (let i = 3; i < steps - 2; i += 3 + Math.floor(random() * 3)) tuftAt.add(i);
-for (let i = 0; i <= steps; i++) {
-	const a = Math.PI * 0.95 + (i / steps) * Math.PI * 1.07;
-	const r = 150 + R(4);
-	const p: Pt = [hcx + r * Math.cos(a), hcy + r * Math.sin(a)];
-	if (tuftAt.has(i)) {
-		const fa = hairDir(p[0], p[1]);
-		const ta = Math.atan2(Math.sin(a) + Math.sin(fa) * 1.2, Math.cos(a) + Math.cos(fa) * 1.2);
-		const L = 14 + random() * 24;
-		hair.push([p[0] + Math.cos(ta) * L, p[1] + Math.sin(ta) * L]);
-	} else hair.push(p);
-}
-hair.push(
-	[824, 462],
-	[806, 488],
-	[788, 454],
-	[766, 484],
-	[746, 452],
-	[722, 490],
-	[700, 458],
-	[678, 497],
-	[658, 466],
-	[638, 506],
-	[618, 478],
-	[600, 532],
-	[582, 496],
-	[566, 546],
-	[548, 506],
-);
-texturedMass(hair, {
-	dir: hairDir,
-	count: 120,
-	fine: 70,
-	margin: 14,
-	len: [35, 100],
-	w: [1.2, 2.7],
+hairMop({
+	crown: [540, 315],
+	fringeY: 430,
+	centre: [690, 470],
+	radius: 150,
+	sweep: 1.07,
+	tuft: [14, 24],
+	fringe: [
+		[824, 462],
+		[806, 488],
+		[788, 454],
+		[766, 484],
+		[746, 452],
+		[722, 490],
+		[700, 458],
+		[678, 497],
+		[658, 466],
+		[638, 506],
+		[618, 478],
+		[600, 532],
+		[582, 496],
+		[566, 546],
+		[548, 506],
+	],
+	mass: { count: 120, fine: 70, margin: 14, len: [35, 100], w: [1.2, 2.7] },
 });
-for (let k = 0; k < 4; k++) {
-	const p = hair[5 + Math.floor(random() * (steps - 10))]!;
-	const ang = Math.atan2(p[1] - hcy, p[0] - hcx) * 0.5 + hairDir(p[0], p[1]) * 0.5;
-	strand(p[0] - Math.cos(ang) * 6, p[1] - Math.sin(ang) * 6, ang, 16 + random() * 18, R(0.9), 1.6);
-}
 
 // Glasses
 roundPoly(
