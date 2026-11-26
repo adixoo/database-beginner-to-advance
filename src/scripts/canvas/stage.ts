@@ -1,6 +1,6 @@
-// Runs a Canvas 2D scene: sizes it for the screen's pixel density, shows its still frame at rest,
-// plays it on hover (or once on load), redraws in the current theme's colours, and never plays
-// when motion is off.
+// Runs a Canvas 2D scene: sizes it for the screen's pixel density, plays it once when it first
+// scrolls into view, redraws in the current theme's colours, and shows its still frame instead
+// of playing when motion is off.
 
 import { FONT_HAND } from './draw';
 
@@ -69,15 +69,7 @@ const handFontsLoaded = Promise.all(
 	.catch(() => [])
 	.then(() => document.fonts.ready);
 
-// 'hover': plays when the pointer is over it (or it is tapped). 'load': plays once when it
-// first scrolls into view.
-export type PlayOn = 'hover' | 'load';
-
-export function mountScene(
-	canvas: HTMLCanvasElement,
-	scene: Scene,
-	playOn: PlayOn = 'hover',
-): void {
+export function mountScene(canvas: HTMLCanvasElement, scene: Scene): void {
 	const ctx = canvas.getContext('2d');
 	if (!ctx) return;
 
@@ -86,8 +78,9 @@ export function mountScene(
 	const root = document.documentElement;
 	let colors = readPalette();
 	let dark = root.classList.contains('dark');
-	// At rest the canvas holds the still frame and nothing runs, so scrolling costs nothing
-	let t = scene.still;
+	// Blank until it plays, so the finished frame never flashes first; with motion off it holds
+	// the still frame. Once played, nothing runs, so scrolling costs nothing.
+	let t = reduced.matches ? scene.still : 0;
 	let startedAt = 0;
 	let frame = 0;
 
@@ -120,20 +113,12 @@ export function mountScene(
 		render();
 	};
 
-	if (playOn === 'hover') {
-		// Hovering (or tapping) plays it; a looping scene stops when the pointer leaves, a
-		// one-shot scene finishes its pass
-		canvas.addEventListener('pointerenter', play);
-		if (scene.loop) canvas.addEventListener('pointerleave', rest);
-	} else {
-		const io = new IntersectionObserver(([entry]) => {
-			if (!entry?.isIntersecting) return;
-			io.disconnect();
-			t = 0;
-			play();
-		});
-		io.observe(canvas);
-	}
+	const io = new IntersectionObserver(([entry]) => {
+		if (!entry?.isIntersecting) return;
+		io.disconnect();
+		play();
+	});
+	io.observe(canvas);
 
 	new ResizeObserver(([entry]) => {
 		const width = entry?.contentRect.width ?? 0;

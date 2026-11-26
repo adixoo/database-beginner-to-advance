@@ -76,8 +76,8 @@ const DONE = FLY_START + FLY_GAP * (USERS.length - 1) + FLY_MS;
 // Notes wait for the rows, so they point at real data
 const NOTE_ID = DONE + 250;
 const NOTE_TABLE = DONE + 1150;
-const FADE = 10400;
-const END = 10900;
+// The last note is written: the scene stops here and holds this frame
+const END = NOTE_TABLE + 1100;
 
 // Layout
 const CODE = { x: 48, y: 78, line: 24, size: 13 };
@@ -152,11 +152,11 @@ function drawGutter(
 	ctx.textAlign = 'left';
 }
 
-function drawTable(ctx: CanvasRenderingContext2D, t: number, colors: Palette, fade: number) {
+function drawTable(ctx: CanvasRenderingContext2D, t: number, colors: Palette) {
 	const shown = progress(t, TABLE_IN, TABLE_IN + 300);
 	if (shown <= 0) return;
 	ctx.save();
-	ctx.globalAlpha = fade * shown;
+	ctx.globalAlpha = shown;
 
 	// Results pane with the table's name and its live row count
 	ctx.fillStyle = colors.raised;
@@ -234,9 +234,15 @@ function drawFlights(ctx: CanvasRenderingContext2D, t: number, colors: Palette) 
 }
 
 function drawOutput(ctx: CanvasRenderingContext2D, t: number, colors: Palette) {
+	// The log's label arrives with its first message
+	const shown = progress(t, TABLE_IN, TABLE_IN + 250);
+	if (shown <= 0) return;
+	ctx.save();
+	ctx.globalAlpha = shown;
 	ctx.fillStyle = colors.inkMuted;
 	ctx.font = `600 12px ${FONT_SANS}`;
 	ctx.fillText('Output', OUTPUT.x, OUTPUT.y);
+	ctx.restore();
 	const messages: [at: number, text: string][] = [
 		[TABLE_IN, 'Table users created'],
 		[DONE, `${USERS.length} rows inserted · 0.4 ms`],
@@ -261,11 +267,9 @@ export const tableScene: Scene = {
 	width: W,
 	height: H,
 	duration: END,
-	loop: true,
-	still: 9000,
+	loop: false,
+	still: END,
 	draw(ctx, t, colors) {
-		const fade = 1 - progress(t, FADE, END);
-		ctx.globalAlpha = fade;
 		drawWindow(ctx, W, H, 'shop.db', colors);
 		drawRunButton(ctx, t, colors);
 
@@ -290,7 +294,7 @@ export const tableScene: Scene = {
 		if (t < RUN_CREATE) drawCaret(ctx, createCaret, t, colors.ink, CODE.size);
 		if (typingInsert) drawCaret(ctx, insertCaret, t, colors.ink, CODE.size);
 
-		drawTable(ctx, t, colors, fade);
+		drawTable(ctx, t, colors);
 		drawOutput(ctx, t, colors);
 		drawFlights(ctx, t, colors);
 
@@ -321,6 +325,5 @@ export const tableScene: Scene = {
 				color: colors.butter,
 			},
 		);
-		ctx.globalAlpha = 1;
 	},
 };
