@@ -5,6 +5,12 @@
 // (target, arrow, note). One SVG so the arrows stay locked to the rows at any width; below
 // ~540px it scrolls sideways.
 import JoinResult from './JoinResult.astro';
+import {
+	JOIN_POSTS_COLUMNS,
+	JOIN_POSTS_ROWS,
+	JOIN_USERS_COLUMNS,
+	JOIN_USERS_ROWS,
+} from './join-tables';
 import SvgTable from './SvgTable.astro';
 ---
 
@@ -31,16 +37,8 @@ import SvgTable from './SvgTable.astro';
 				x={10}
 				y={40}
 				width={330}
-				columns={[
-					{ label: 'id', x: 54, anchor: 'end' },
-					{ label: 'user_id', x: 124, anchor: 'end', key: true },
-					{ label: 'caption', x: 150, anchor: 'start' },
-				]}
-				rows={[
-					['101', '1', 'Sunset at the beach'],
-					['102', '2', 'First latte art'],
-					['103', '1', 'Weekend trek'],
-				]}
+				columns={JOIN_POSTS_COLUMNS}
+				rows={JOIN_POSTS_ROWS}
 				keyTint={{ x: 64, width: 66 }}
 			/>
 			<SvgTable
@@ -48,16 +46,8 @@ import SvgTable from './SvgTable.astro';
 				x={440}
 				y={40}
 				width={230}
-				columns={[
-					{ label: 'id', x: 474, anchor: 'end', key: true },
-					{ label: 'username', x: 494, anchor: 'start' },
-					{ label: 'name', x: 600, anchor: 'start' },
-				]}
-				rows={[
-					['1', 'asha.codes', 'Asha'],
-					['2', 'ravi.clicks', 'Ravi'],
-					['3', 'meera.eats', 'Meera'],
-				]}
+				columns={JOIN_USERS_COLUMNS}
+				rows={JOIN_USERS_ROWS}
 				keyTint={{ x: 446, width: 40 }}
 			/>
 			<!-- meera.eats has no match: dim the row -->

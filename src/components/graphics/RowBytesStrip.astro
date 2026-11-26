@@ -1,0 +1,84 @@
+---
+// The row (1, 'Buy milk') as a strip of bytes, drawn inside a graphic's SVG with its top at y.
+// The geometry lives in row-bytes.ts so the graphic can label the cells.
+import {
+	CELL_HEIGHT,
+	CHAR_STEP,
+	CHAR_WIDTH,
+	CHAR_X,
+	HEADER_CELL,
+	ID_CELL,
+	ROW_BODY,
+} from './row-bytes';
+
+interface Props {
+	y: number;
+}
+
+const { y } = Astro.props;
+
+const chars = [...ROW_BODY].map((char, index) => ({
+	char: char === ' ' ? '·' : char,
+	isSpace: char === ' ',
+	x: CHAR_X + index * CHAR_STEP,
+}));
+---
+
+<rect
+	x={HEADER_CELL.x}
+	y={y}
+	width={HEADER_CELL.width}
+	height={CELL_HEIGHT}
+	rx="8"
+	fill="var(--color-sky)"
+	fill-opacity="0.14"
+	stroke="var(--color-sky)"
+	stroke-width="2"></rect>
+<text
+	x={HEADER_CELL.x + HEADER_CELL.width / 2}
+	y={y + 27}
+	text-anchor="middle"
+	font-size="14"
+	fill="var(--color-ink)">header</text
+>
+<rect
+	x={ID_CELL.x}
+	y={y}
+	width={ID_CELL.width}
+	height={CELL_HEIGHT}
+	rx="8"
+	fill="var(--color-mint)"
+	fill-opacity="0.16"></rect>
+<text
+	x={ID_CELL.x + ID_CELL.width / 2}
+	y={y + 28}
+	text-anchor="middle"
+	font-family="var(--font-mono)"
+	font-size="16"
+	font-weight="600"
+	fill="var(--color-mint)">1</text
+>
+{
+	chars.map((cell) => (
+		<g>
+			<rect
+				x={cell.x}
+				y={y}
+				width={CHAR_WIDTH}
+				height={CELL_HEIGHT}
+				rx="8"
+				fill="var(--color-raised)"
+			/>
+			<text
+				x={cell.x + CHAR_WIDTH / 2}
+				y={y + 28}
+				text-anchor="middle"
+				font-family="var(--font-mono)"
+				font-size="16"
+				fill={cell.isSpace ? 'var(--color-ink-muted)' : 'var(--color-ink)'}
+			>
+				{cell.char}
+			</text>
+		</g>
+	))
+}

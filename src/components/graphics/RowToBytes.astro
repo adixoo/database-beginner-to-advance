@@ -2,25 +2,14 @@
 // One tuple written out as bytes: a row header (sky) that records each value's size and which
 // are NULL, then the id (mint), then the body one byte per letter, with no gaps between them.
 // Below ~540px it scrolls sideways.
+import { BODY_END, CELL_HEIGHT, CHAR_X, HEADER_CELL, ID_CELL, ROW_BODY } from './row-bytes';
+import RowBytesStrip from './RowBytesStrip.astro';
 
-const TUPLE = "(1, 'Buy milk')";
-const BODY = 'Buy milk';
+const TUPLE = `(1, '${ROW_BODY}')`;
 
 const STRIP_Y = 150;
-const CELL_HEIGHT = 44;
-const HEADER_CELL = { x: 10, width: 96 };
-const ID_CELL = { x: 110, width: 44 };
-const CHAR_X = 158;
-const CHAR_WIDTH = 42;
-const CHAR_STEP = 46;
 const LABEL_Y = STRIP_Y + CELL_HEIGHT + 22;
-
-const chars = [...BODY].map((char, index) => ({
-	char: char === ' ' ? '·' : char,
-	isSpace: char === ' ',
-	x: CHAR_X + index * CHAR_STEP,
-}));
-const bodyCentre = CHAR_X + ((chars.length - 1) * CHAR_STEP + CHAR_WIDTH) / 2;
+const bodyCentre = (CHAR_X + BODY_END) / 2;
 ---
 
 <figure class="not-prose my-10">
@@ -57,64 +46,7 @@ const bodyCentre = CHAR_X + ((chars.length - 1) * CHAR_STEP + CHAR_WIDTH) / 2;
 				<text x="14" y={STRIP_Y - 14} font-size="17" font-weight="700" fill="var(--color-ink)"
 					>as bytes</text
 				>
-				<rect
-					x={HEADER_CELL.x}
-					y={STRIP_Y}
-					width={HEADER_CELL.width}
-					height={CELL_HEIGHT}
-					rx="8"
-					fill="var(--color-sky)"
-					fill-opacity="0.14"
-					stroke="var(--color-sky)"
-					stroke-width="2"></rect>
-				<text
-					x={HEADER_CELL.x + HEADER_CELL.width / 2}
-					y={STRIP_Y + 27}
-					text-anchor="middle"
-					font-size="14"
-					fill="var(--color-ink)">header</text
-				>
-				<rect
-					x={ID_CELL.x}
-					y={STRIP_Y}
-					width={ID_CELL.width}
-					height={CELL_HEIGHT}
-					rx="8"
-					fill="var(--color-mint)"
-					fill-opacity="0.16"></rect>
-				<text
-					x={ID_CELL.x + ID_CELL.width / 2}
-					y={STRIP_Y + 28}
-					text-anchor="middle"
-					font-family="var(--font-mono)"
-					font-size="16"
-					font-weight="600"
-					fill="var(--color-mint)">1</text
-				>
-				{
-					chars.map((cell) => (
-						<g>
-							<rect
-								x={cell.x}
-								y={STRIP_Y}
-								width={CHAR_WIDTH}
-								height={CELL_HEIGHT}
-								rx="8"
-								fill="var(--color-raised)"
-							/>
-							<text
-								x={cell.x + CHAR_WIDTH / 2}
-								y={STRIP_Y + 28}
-								text-anchor="middle"
-								font-family="var(--font-mono)"
-								font-size="16"
-								fill={cell.isSpace ? 'var(--color-ink-muted)' : 'var(--color-ink)'}
-							>
-								{cell.char}
-							</text>
-						</g>
-					))
-				}
+				<RowBytesStrip y={STRIP_Y} />
 
 				<!-- What each part is -->
 				<g font-size="13" fill="var(--color-ink-muted)" text-anchor="middle">

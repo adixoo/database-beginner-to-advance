@@ -2,28 +2,16 @@
 // What a row header holds: the row (1, 'Buy milk') as bytes, with the header opened up below it.
 // The header notes each value's size (id 1 byte in mint, body 8 bytes in peach, matching the
 // brackets over the values) and which values are NULL. Below ~540px it scrolls sideways.
+import { BODY_END, CELL_HEIGHT, CHAR_X, HEADER_CELL, ID_CELL } from './row-bytes';
+import RowBytesStrip from './RowBytesStrip.astro';
 
-const BODY = 'Buy milk';
 const STRIP_Y = 54;
-const CELL_HEIGHT = 44;
-const HEADER_CELL = { x: 10, width: 96 };
-const ID_CELL = { x: 110, width: 44 };
-const CHAR_X = 158;
-const CHAR_WIDTH = 42;
-const CHAR_STEP = 46;
 const BRACKET_TOP = 38;
 const BRACKET_BOTTOM = 46;
 
 const ZOOM = { x: 10, y: 140, width: 440, height: 64 };
 const ENTRY_Y = ZOOM.y + 12;
 const ENTRY_HEIGHT = 40;
-
-const chars = [...BODY].map((char, index) => ({
-	char: char === ' ' ? '·' : char,
-	isSpace: char === ' ',
-	x: CHAR_X + index * CHAR_STEP,
-}));
-const bodyEnd = CHAR_X + (chars.length - 1) * CHAR_STEP + CHAR_WIDTH;
 
 const ENTRIES = [
 	{ text: 'id: 1 byte', x: 22, width: 130, tone: 'var(--color-mint)' },
@@ -51,76 +39,19 @@ const ENTRIES = [
 				<!-- How many bytes each value takes -->
 				<g font-family="var(--font-mono)" font-size="13" text-anchor="middle">
 					<text x={ID_CELL.x + ID_CELL.width / 2} y="30" fill="var(--color-mint)">1 byte</text>
-					<text x={(CHAR_X + bodyEnd) / 2} y="30" fill="var(--color-peach)">8 bytes</text>
+					<text x={(CHAR_X + BODY_END) / 2} y="30" fill="var(--color-peach)">8 bytes</text>
 				</g>
 				<g fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<path
 						d={`M${ID_CELL.x + 2} ${BRACKET_BOTTOM} V${BRACKET_TOP} H${ID_CELL.x + ID_CELL.width - 2} V${BRACKET_BOTTOM}`}
 						stroke="var(--color-mint)"></path>
 					<path
-						d={`M${CHAR_X + 2} ${BRACKET_BOTTOM} V${BRACKET_TOP} H${bodyEnd - 2} V${BRACKET_BOTTOM}`}
+						d={`M${CHAR_X + 2} ${BRACKET_BOTTOM} V${BRACKET_TOP} H${BODY_END - 2} V${BRACKET_BOTTOM}`}
 						stroke="var(--color-peach)"></path>
 				</g>
 
 				<!-- The row as bytes -->
-				<rect
-					x={HEADER_CELL.x}
-					y={STRIP_Y}
-					width={HEADER_CELL.width}
-					height={CELL_HEIGHT}
-					rx="8"
-					fill="var(--color-sky)"
-					fill-opacity="0.14"
-					stroke="var(--color-sky)"
-					stroke-width="2"></rect>
-				<text
-					x={HEADER_CELL.x + HEADER_CELL.width / 2}
-					y={STRIP_Y + 27}
-					text-anchor="middle"
-					font-size="14"
-					fill="var(--color-ink)">header</text
-				>
-				<rect
-					x={ID_CELL.x}
-					y={STRIP_Y}
-					width={ID_CELL.width}
-					height={CELL_HEIGHT}
-					rx="8"
-					fill="var(--color-mint)"
-					fill-opacity="0.16"></rect>
-				<text
-					x={ID_CELL.x + ID_CELL.width / 2}
-					y={STRIP_Y + 28}
-					text-anchor="middle"
-					font-family="var(--font-mono)"
-					font-size="16"
-					font-weight="600"
-					fill="var(--color-mint)">1</text
-				>
-				{
-					chars.map((cell) => (
-						<g>
-							<rect
-								x={cell.x}
-								y={STRIP_Y}
-								width={CHAR_WIDTH}
-								height={CELL_HEIGHT}
-								rx="8"
-								fill="var(--color-raised)"
-							/>
-							<text
-								x={cell.x + CHAR_WIDTH / 2}
-								y={STRIP_Y + 28}
-								text-anchor="middle"
-								font-family="var(--font-mono)"
-								font-size="16"
-								fill={cell.isSpace ? 'var(--color-ink-muted)' : 'var(--color-ink)'}
-							>
-								{cell.char}
-							</text>
-						</g>
-					))
-				}
+				<RowBytesStrip y={STRIP_Y} />
 
 				<!-- The header, opened up -->
 				<g fill="none" stroke="var(--color-gray-600)" stroke-width="1.5" stroke-dasharray="4 5">
